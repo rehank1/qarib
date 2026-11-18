@@ -30,7 +30,7 @@ $$;
 -- ---------- who manages which masjid ----------
 create table if not exists public.masjid_admins (
   user_id     uuid not null references auth.users (id) on delete cascade,
-  osm_id      text not null check (osm_id ~ '^(node|way|relation)/[0-9]{1,12}$'),
+  osm_id      text not null check (osm_id ~ '^((node|way|relation)/[0-9]{1,12}|qarib/[0-9]{1,9})$'),
   masjid_name text not null check (char_length(masjid_name) between 1 and 80),
   status      text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
   created_at  timestamptz not null default now(),
@@ -52,7 +52,7 @@ declare v_name text := left(trim(regexp_replace(regexp_replace(coalesce(p_name, 
         v_existing text;
 begin
   if auth.uid() is null then raise exception 'Please sign in.' using errcode = '28000'; end if;
-  if coalesce(p_osm, '') !~ '^(node|way|relation)/[0-9]{1,12}$' or char_length(v_name) = 0 then raise exception 'Choose a masjid from the list.' using errcode = '22023'; end if;
+  if coalesce(p_osm, '') !~ '^((node|way|relation)/[0-9]{1,12}|qarib/[0-9]{1,9})$' or char_length(v_name) = 0 then raise exception 'Choose a masjid from the list.' using errcode = '22023'; end if;
   if (select count(*) from public.masjid_admins where user_id = auth.uid() and status = 'pending') >= 5 then
     raise exception 'Too many pending requests. Wait for approval first.' using errcode = 'P0001';
   end if;
@@ -65,7 +65,7 @@ end $$;
 
 -- ---------- published jamaat times ----------
 create table if not exists public.prayer_times (
-  osm_id     text primary key check (osm_id ~ '^(node|way|relation)/[0-9]{1,12}$'),
+  osm_id     text primary key check (osm_id ~ '^((node|way|relation)/[0-9]{1,12}|qarib/[0-9]{1,9})$'),
   fajr time not null, dhuhr time not null, asr time not null, maghrib time not null, isha time not null, jumuah time,
   updated_by uuid not null default auth.uid() references auth.users (id),
   updated_at timestamptz not null default now(),
@@ -150,7 +150,7 @@ begin
     on conflict do nothing;  -- a daily-rotating hash: the install id itself is never stored
   for e in select value from jsonb_array_elements(p_events) limit 20 loop
     if e ->> 'k' = 'open' then v_key := '';
-    elsif e ->> 'k' in ('view', 'directions') and coalesce(e ->> 'id', '') ~ '^(node|way|relation)/[0-9]{1,12}$' then v_key := e ->> 'id';
+    elsif e ->> 'k' in ('view', 'directions') and coalesce(e ->> 'id', '') ~ '^((node|way|relation)/[0-9]{1,12}|qarib/[0-9]{1,9})$' then v_key := e ->> 'id';
     else continue; end if;
     insert into private.metrics (day, kind, key, count) values (d, e ->> 'k', v_key, 1)
       on conflict (day, kind, key) do update set count = metrics.count + 1;

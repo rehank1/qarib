@@ -18,8 +18,8 @@ export const isLat = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 
 export const isLng = (v) => typeof v === 'number' && Number.isFinite(v) && v >= -180 && v <= 180;
 export const isCoord = (p) => !!p && isLat(p.lat) && isLng(p.lng);
 
-/** OpenStreetMap element id, e.g. "node/123456". The key the backend uses for a masjid. */
-export const isOsmId = (v) => typeof v === 'string' && /^(node|way|relation)\/\d{1,12}$/.test(v);
+/** A masjid's id: OpenStreetMap ("node/123456") or added by hand in Qarib ("qarib/45"). */
+export const isOsmId = (v) => typeof v === 'string' && /^((node|way|relation)\/\d{1,12}|qarib\/\d{1,9})$/.test(v);
 
 /** 24-hour "HH:MM". */
 export const isTime = (v) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);

@@ -106,3 +106,35 @@ test('update notice: only the owner can publish it, only for a Qarib release lin
   const [row] = await as('anon', null, `select value from public.app_config where key = 'android_latest'`);
   assert.deepEqual(row.value, { version: '1.0.1', message: 'Live jamaat times script', url: 'https://github.com/rehank1/qarib/releases/latest' });
 });
+
+// ---------- masjids added by hand (supabase/submissions.sql); PostGIS is stubbed (PGlite has none) ----------
+test('add a masjid: signed-in only, validated, owner approves, it joins the directory and the submitter manages it', async () => {
+  await db.exec(`
+    create domain extensions.geography as text;
+    create function extensions.st_makepoint(x float8, y float8) returns text language sql as $$ select 'POINT(' || x || ' ' || y || ')' $$;
+    create function extensions.st_setsrid(g text, s int) returns text language sql as $$ select g $$;
+    create table public.masjids (osm_id text primary key, name text not null, name_ar text, address text, location extensions.geography not null, tile text not null, updated_at timestamptz not null default now());
+    grant execute on all functions in schema extensions to anon, authenticated;`);
+  await db.exec(readFileSync(new URL('../supabase/submissions.sql', import.meta.url), 'utf8'));
+  const add = (uid, o = {}) => as('authenticated', uid, `select public.submit_masjid($1, $2, $3, $4, $5, $6, $7, $8) as id`,
+    [o.name ?? '<b>Masjid-e-Rahmat</b>', '12 MG Road', 'Camp', 'Pune', 'Maharashtra', o.pin ?? '411001', o.lat ?? 18.5167, o.lng ?? 73.8794]);
+  await fails(as('anon', null, `select public.submit_masjid('x','x','x','x','x','411001',18.5,73.8)`), /permission denied/);
+  await fails(add(IMAM, { pin: '1234' }), /pincode/);
+  await fails(add(IMAM, { lat: 51.5, lng: -0.1 }), /inside India/);
+  const [{ id }] = await add(IMAM);
+  assert.ok(id > 0);
+  assert.deepEqual((await as('authenticated', OTHER, 'select id from public.masjid_submissions')), [], 'others cannot see it');
+  await fails(as('authenticated', IMAM, `select public.decide_submission(${id}, 'approved')`), /Owner only/);
+  const pending = await as('authenticated', OWNER, 'select * from public.admin_submissions()');
+  assert.equal(pending[0].name, 'Masjid-e-Rahmat'); assert.equal(pending[0].address, '12 MG Road, Camp, Pune, Maharashtra 411001');
+  const [{ osm }] = await as('authenticated', OWNER, `select public.decide_submission(${id}, 'approved') as osm`);
+  assert.equal(osm, `qarib/${id}`);
+  const m = (await db.query(`select name, tile from public.masjids where osm_id = $1`, [osm])).rows[0];
+  assert.deepEqual(m, { name: 'Masjid-e-Rahmat', tile: 'user' });
+  assert.equal((await as('authenticated', IMAM, `select status from public.masjid_admins where osm_id = '${osm}'`))[0].status, 'approved', 'submitter manages it');
+  await as('authenticated', IMAM, `insert into public.prayer_times (osm_id, fajr, dhuhr, asr, maghrib, isha) values ('${osm}', ${T})`);
+  await db.exec(`delete from public.masjids where osm_id = '${osm}'`);
+  assert.equal((await db.query(`select count(*)::int n from public.masjids where osm_id = $1`, [osm])).rows[0].n, 1, 'the map refresh can never delete it');
+  for (let i = 0; i < 3; i++) await add(OTHER, { name: 'M' + i });
+  await fails(add(OTHER, { name: 'M4' }), /3 masjids waiting/);
+});

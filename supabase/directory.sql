@@ -8,7 +8,7 @@ create extension if not exists http with schema extensions;
 create extension if not exists pg_cron;
 
 create table if not exists public.masjids (
-  osm_id     text primary key check (osm_id ~ '^(node|way|relation)/[0-9]{1,12}$'),
+  osm_id     text primary key check (osm_id ~ '^((node|way|relation)/[0-9]{1,12}|qarib/[0-9]{1,9})$'),
   name       text not null check (char_length(name) between 1 and 80),
   name_ar    text,
   address    text,
@@ -80,7 +80,7 @@ begin
              coalesce((el ->> 'lon')::float8, (el -> 'center' ->> 'lon')::float8) as lng
       from jsonb_array_elements(coalesce(body::jsonb -> 'elements', '[]'::jsonb)) el
     ) x
-    where id ~ '^(node|way|relation)/[0-9]{1,12}$' and lat between -90 and 90 and lng between -180 and 180
+    where id ~ '^((node|way|relation)/[0-9]{1,12}|qarib/[0-9]{1,9})$' and lat between -90 and 90 and lng between -180 and 180
     on conflict (osm_id) do update set name = excluded.name, name_ar = excluded.name_ar, address = excluded.address,
       location = excluded.location, tile = excluded.tile, updated_at = excluded.updated_at;
   get diagnostics v_found = row_count;
