@@ -7,7 +7,7 @@
 - **Portal:** imams sign in, ask to manage their masjid, and publish jamaat times after the owner approves them.
 - **Dashboard (owner only):** live, anonymous numbers: active users, app opens, Directions taps per masjid, imam requests to approve.
 - **Salawat reminder** when the app opens (can be turned off).
-- **Light and free:** no framework, no web fonts, no paid service. Android APK published on GitHub Releases, API on Cloudflare's free plan.
+- **Light and free:** no framework, no web fonts, no paid service. Android APK on GitHub Releases, backend on Supabase's free plan.
 
 ## Try it on this PC
 
@@ -26,27 +26,24 @@ Then open http://localhost:4180. With no API configured, the portal runs in **de
 ```
 index.html, styles/          app shell (strict CSP, Trusted Types) and design tokens
 src/app.js                   state, routing, caching rules, startup (salawat, update check, usage counts)
-src/config.js                public settings: version, apiUrl, updateRepo, masjidLimit
+src/config.js                public settings: version, Supabase URL + public anon key, updateRepo
 src/core/                    dom (no innerHTML) · store · validate · net · geo · format · metrics · update
-src/data/                    api.js (live) · demo.js (on this phone) · backend.js (picks one)
+src/data/                    supabase.js (live backend) · demo.js (development only) · backend.js
 src/features/prayer/         prayer engine · home screen · salawat reminder
 src/features/masjids/        OpenStreetMap search (hedged mirrors) · masjid cards with Directions
 src/features/location/       location in context · city search
 src/features/portal/         imam sign-in, claim, publish · owner dashboard
-api/                         Cloudflare Worker + D1 schema (the free backend)
+supabase/                    schema.sql (security rules) · directory.sql (India masjid directory)
 android/                     Capacitor Android project (icons, splash, permissions, release signing)
 .github/workflows/           tests · signed APK → GitHub Release · API deploy
 design/logo/                 the Qarīb logo (SVG + PNG) and its notes
-tests/                       48 tests: prayer maths, security, contrast, the API against real SQLite
+tests/                       46 tests: prayer maths, security, contrast, database rules on real Postgres
+tools/probe-supabase.mjs     outsider test: what the public key can and cannot do
 ```
 
 ## Going live
 
 [docs/OPERATIONS.md](docs/OPERATIONS.md) walks through it step by step:
-1. deploy the free API (Cloudflare),
-2. publish the first APK (GitHub Releases),
-3. push updates,
-4. how the load of the first 5,000–10,000 users is handled,
-5. using the dashboard.
+the backend, releasing and announcing updates, security and load.
 
 See [SECURITY.md](SECURITY.md) for the threat model and pentest, and [docs/DESIGN.md](docs/DESIGN.md) for the design system.
