@@ -25,6 +25,7 @@ create table if not exists private.import_tiles (
   tile text primary key, s double precision not null, w double precision not null, n double precision not null, e double precision not null,
   priority int not null default 0, refreshed_at timestamptz, status text, found int
 );
+alter table private.import_tiles add column if not exists fails int not null default 0;
 -- India and its surroundings in 1° tiles (sea tiles cost one quick empty query a week)
 insert into private.import_tiles (tile, s, w, n, e)
   select la || ':' || lo, la, lo, la + 1, lo + 1 from generate_series(6, 36) la, generate_series(68, 97) lo
@@ -53,7 +54,17 @@ begin
     end;
   end loop;
   if st is distinct from 200 or body is null or left(ltrim(body), 1) <> '{' then
-    update private.import_tiles set status = 'failed ' || coalesce(st, 0), refreshed_at = now() - interval '7 days' + interval '10 minutes' where tile = p_tile; -- busy server: retry in 10 min
+    update private.import_tiles set status = 'failed ' || coalesce(st, 0), fails = fails + 1,
+      refreshed_at = now() - interval '7 days' + interval '10 minutes' where tile = p_tile; -- busy server: retry in 10 min
+    -- an area too dense for the public server to answer in time: split it into 4 smaller areas (down to 1/8 degree, ~14 km)
+    if t.fails + 1 >= 2 and (t.n - t.s) > 0.13 then
+      insert into private.import_tiles (tile, s, w, n, e, priority)
+        select format('%s:%s:%s', t.s + i * (t.n - t.s) / 2, t.w + j * (t.e - t.w) / 2, (t.n - t.s) / 2),
+               t.s + i * (t.n - t.s) / 2, t.w + j * (t.e - t.w) / 2, t.s + (i + 1) * (t.n - t.s) / 2, t.w + (j + 1) * (t.e - t.w) / 2, t.priority
+        from generate_series(0, 1) i, generate_series(0, 1) j
+        on conflict do nothing;
+      delete from private.import_tiles where tile = p_tile;
+    end if;
     return -1;
   end if;
   insert into public.masjids (osm_id, name, name_ar, address, location, tile, updated_at)
@@ -105,7 +116,8 @@ begin
     from public.masjids m order by m.location operator(extensions.<->) p limit least(greatest(coalesce(p_limit, 25), 1), 50);
   select extensions.st_distance(m.location, p) / 1000 into nearest from public.masjids m order by m.location operator(extensions.<->) p limit 1;
   if nearest is null or nearest > 30 then
-    update private.import_tiles set priority = 1000 where tile = floor(p_lat)::int || ':' || floor(p_lng)::int and (refreshed_at is null or status <> 'ok');
+    update private.import_tiles set priority = 1000
+      where p_lat >= s and p_lat < n and p_lng >= w and p_lng < e and (refreshed_at is null or status <> 'ok'); -- whatever size the area is now
   end if;
 end $$;
 
