@@ -1,0 +1,23 @@
+{
+  "name": "qarib",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Qarīb: nearest masjids, jamaat times and prayer times. PWA + iOS/Android via Capacitor.",
+  "type": "module",
+  "scripts": {
+    "serve": "node tools/serve.mjs . 4180",
+    "test": "node --test tests/core.test.js tests/security.test.js tests/api.test.js",
+    "build": "node tools/build.mjs",
+    "cap:add": "npx cap add android",
+    "cap:sync": "npm run build && npx cap sync",
+    "android": "npm run cap:sync && npx cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Qarīb</string>
+    <string name="title_activity_main">Qarīb</string>
+    <string name="package_name">app.qarib.masjids</string>
+    <string name="custom_url_scheme">app.qarib.masjids</string>
+</resources>

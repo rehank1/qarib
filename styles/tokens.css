@@ -1,0 +1,60 @@
+/* Qarīb design tokens.
+   Colour theory: a near-complementary pair of deep teal-green (cool, ~190°, the calm of the night sky and the
+   traditional green of the masjid) and lamp-lit gold (warm, ~42°). Proportion 60 · 30 · 10:
+     60% surfaces (teal-black / parchment) · 30% text and raised containers · 10% gold, reserved for the ONE thing
+     to look at or press on each screen (next prayer, current prayer, the primary button, the active tab).
+   Status colours are kept apart from the accent: emerald = verified, amber = stale/demo, coral = error.
+   Every text role meets WCAG 2.2 AA (4.5:1) on every surface in both themes; tests/contrast.test.js checks it. */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #091215;
+  --surface: #0f1c20;
+  --surface-2: #152a2f;
+  --surface-3: #1c363c;
+  --text: #ecf3f1;
+  --muted: #a5b8b3;
+  --gold: #e8c16a;
+  --gold-strong: #f3d489;
+  --on-gold: #1b1404;
+  --emerald: #5bd1a6;
+  --amber: #f2c46b;
+  --danger: #ff8f85;
+  --line: rgba(232, 193, 106, 0.16);
+  --line-strong: rgba(232, 193, 106, 0.4);
+  --glow: rgba(232, 193, 106, 0.22);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --sky: radial-gradient(120% 70% at 85% -10%, rgba(232, 193, 106, 0.14), transparent 60%), radial-gradient(90% 60% at 0% 0%, rgba(91, 209, 166, 0.08), transparent 70%);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f7f2e8;
+  --surface: #fffdf8;
+  --surface-2: #f0e8d8;
+  --surface-3: #e7dcc6;
+  --text: #17211f;
+  --muted: #4f5c59;
+  --gold: #7a5a16;
+  --gold-strong: #5f450f;
+  --on-gold: #ffffff;
+  --emerald: #1b7356;
+  --amber: #7d5300;
+  --danger: #b3261e;
+  --line: rgba(122, 90, 22, 0.18);
+  --line-strong: rgba(122, 90, 22, 0.42);
+  --glow: rgba(122, 90, 22, 0.14);
+  --shadow: 0 8px 24px rgba(60, 45, 10, 0.1);
+  --sky: radial-gradient(120% 70% at 85% -10%, rgba(232, 193, 106, 0.28), transparent 60%), radial-gradient(90% 60% at 0% 0%, rgba(27, 115, 86, 0.08), transparent 70%);
+}
+:root {
+  /* type: system faces only (zero font downloads), Arabic in the platform's Naskh */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-ar: "Noto Naskh Arabic", "Geeza Pro", "Arabic Typesetting", "Segoe UI", serif;
+  --step--1: 0.84rem; --step-0: 1rem; --step-1: 1.2rem; --step-2: 1.5rem; --step-3: 2.1rem; --step-4: clamp(2.6rem, 11vw, 3.6rem);
+  /* 4-point spacing */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+  --r-sm: 10px; --r: 16px; --r-lg: 22px; --pill: 999px;
+  --tap: 48px; /* minimum touch target (Material / Apple HIG) */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --tabbar-h: 64px;
+}

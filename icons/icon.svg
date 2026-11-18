@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="t">
+  <title id="t">Qarib</title>
+  <defs>
+    <radialGradient id="bg" gradientUnits="userSpaceOnUse" cx="256" cy="200" r="400"><stop offset="0" stop-color="#1c363c"/><stop offset=".6" stop-color="#0f1c20"/><stop offset="1" stop-color="#091215"/></radialGradient>
+    <linearGradient id="gold" gradientUnits="userSpaceOnUse" x1="170" y1="90" x2="342" y2="420"><stop offset="0" stop-color="#f6dc96"/><stop offset=".5" stop-color="#e8c16a"/><stop offset="1" stop-color="#b98d34"/></linearGradient>
+  </defs>
+  <!-- full-bleed background so the icon is maskable; mark sits well inside the central 80% safe circle -->
+  <rect id="background" width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- symbol: a pointed-arch dome that tapers into a map-pin tip, with a mihrab niche cut through it (flat fallback: #e8c16a) -->
+  <path id="symbol" fill="url(#gold)" fill-rule="evenodd" d="M151 238.5 A172.2 172.2 0 0 1 256 79.9 A172.2 172.2 0 0 1 361 238.5 C361 317.2 288.8 366.4 256 423.8 C223.2 366.4 151 317.2 151 238.5 Z M210.1 245 A82 82 0 0 1 256 171.4 A82 82 0 0 1 301.9 245 V323.8 H210.1 Z"/>
+</svg>

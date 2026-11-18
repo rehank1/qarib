@@ -1,0 +1,8 @@
+{
+  "appId": "app.qarib.masjids",
+  "appName": "Qarīb",
+  "webDir": "www",
+  "server": { "androidScheme": "https", "cleartext": false },
+  "android": { "allowMixedContent": false, "webContentsDebuggingEnabled": false },
+  "ios": { "contentInset": "never" }
+}

@@ -1,0 +1,13 @@
+node_modules/
+www/
+android/app/build/
+ios/App/Pods/
+.env*
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+.keys/
+android/app/release/
+*.apk
+*.aab
