@@ -1,4 +1,6 @@
 // Unit tests: node --test (no dependencies). Run: npm test
+// Times are checked as a phone in India sees them, on any machine (GitHub's runners use UTC).
+process.env.TZ = 'Asia/Kolkata';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeTimes, schedule, clock, defaultSettings, hijriMonth, hijriLabel } from '../src/features/prayer/praytimes.js';
