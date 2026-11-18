@@ -44,7 +44,7 @@ begin
   select * into t from private.import_tiles where tile = p_tile;
   if not found then return -1; end if;
   q := format('[out:json][timeout:90];(nwr["amenity"="place_of_worship"]["religion"="muslim"](%1$s,%2$s,%3$s,%4$s);nwr["building"="mosque"](%1$s,%2$s,%3$s,%4$s););out center tags;', t.s, t.w, t.n, t.e);
-  perform extensions.http_set_curlopt('CURLOPT_TIMEOUT', '110');
+  perform set_config('http.timeout_msec', '120000', true); -- public Overpass servers can take 30-60 s; the default is 5 s
   foreach url in array array['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'] loop
     begin
       select r.status, r.content into st, body from extensions.http_post(url, 'data=' || extensions.urlencode(q), 'application/x-www-form-urlencoded') r;
@@ -146,3 +146,6 @@ grant execute on function public.admin_stats() to authenticated;
 -- scheduled jobs (pg_cron runs as the database owner)
 select cron.schedule('qarib-directory', '* * * * *', 'select private.refresh_next_tile()');
 select cron.schedule('qarib-housekeeping', '17 3 * * *', 'select private.housekeeping()');
+
+-- tiles that failed before the timeout fix (or during a server outage) go back to the front of the queue
+update private.import_tiles set refreshed_at = null, status = null where status like 'failed%';
