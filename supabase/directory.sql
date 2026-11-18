@@ -53,7 +53,7 @@ begin
     end;
   end loop;
   if st is distinct from 200 or body is null or left(ltrim(body), 1) <> '{' then
-    update private.import_tiles set status = 'failed ' || coalesce(st, 0), refreshed_at = now() - interval '6 days 23 hours' where tile = p_tile; -- retry in ~1 h
+    update private.import_tiles set status = 'failed ' || coalesce(st, 0), refreshed_at = now() - interval '7 days' + interval '10 minutes' where tile = p_tile; -- busy server: retry in 10 min
     return -1;
   end if;
   insert into public.masjids (osm_id, name, name_ar, address, location, tile, updated_at)

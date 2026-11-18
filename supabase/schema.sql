@@ -196,3 +196,11 @@ revoke execute on function public.is_owner(), public.is_masjid_admin(text), publ
 grant execute on function public.is_owner(), public.is_masjid_admin(text), public.request_masjid(text, text),
   public.decide_claim(uuid, text, text, boolean), public.set_update_notice(text, text, text), public.admin_claims() to authenticated;
 grant execute on function public.log_events(uuid, jsonb) to anon, authenticated;
+
+-- ---------- hardening: nothing is reachable unless granted above ----------
+-- the GraphQL endpoint is not used by the app: remove it (one less way in)
+drop extension if exists pg_graphql;
+-- anything created later in public starts closed: no table, function or sequence is visible to the app's keys until granted
+alter default privileges in schema public revoke all on tables from anon, authenticated;
+alter default privileges in schema public revoke all on sequences from anon, authenticated;
+alter default privileges in schema public revoke execute on functions from public, anon, authenticated;

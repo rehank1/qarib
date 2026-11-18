@@ -39,7 +39,9 @@ export function nearestFrom(list, origin, limit = 4) {
   return (Array.isArray(list) ? list.slice(0, 200) : [])
     .filter((m) => m && isOsmId(m.id) && isLat(m.lat) && isLng(m.lng))
     .map((m) => ({ id: m.id, name: cleanText(m.name, 80) || 'Masjid (name not listed)', nameAr: cleanText(m.nameAr, 80), address: cleanText(m.address, 120), lat: m.lat, lng: m.lng, km: distanceKm(origin, m) }))
-    .sort((a, b) => a.km - b.km).slice(0, limit);
+    .sort((a, b) => a.km - b.km)
+    .filter((m, i, all) => !all.slice(0, i).some((o) => o.name === m.name && distanceKm(o, m) < 0.06)) // same masjid mapped twice (point + outline)
+    .slice(0, limit);
 }
 
 /** Re-check a list read back from on-device storage (it may be stale, from an older version, or tampered with). */

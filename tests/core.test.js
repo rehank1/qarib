@@ -226,3 +226,9 @@ test('update check compares versions numerically', () => {
   assert.equal(newer('v0.9.0', '1.0.0'), false);
   assert.equal(newer('nightly', '1.0.0'), false);
 });
+
+test('a masjid mapped twice (point and outline, same name, a few metres apart) is shown once', () => {
+  const me = { lat: 19.1, lng: 73.0 };
+  const list = [{ id: 'node/1', name: 'Gulshane Madina Masjid', lat: 19.1010, lng: 73.0 }, { id: 'way/2', name: 'Gulshane Madina Masjid', lat: 19.1011, lng: 73.0001 }, { id: 'node/3', name: 'Noor Masjid', lat: 19.102, lng: 73.0 }];
+  assert.deepEqual(nearestFrom(list, me, 3).map((m) => m.id), ['node/1', 'node/3']);
+});
