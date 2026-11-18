@@ -42,8 +42,12 @@ Both SQL files are safe to re-run: Supabase → **SQL Editor** → paste → **R
    ```bash
    git push origin main v1.0.2
    ```
-4. GitHub runs the tests, builds and signs the APK, and publishes it at https://github.com/rehank1/qarib/releases/latest (about 3 minutes).
-5. **Push the update to phones:** in the app's dashboard, under **Announce an update**, enter `1.0.2` and a short message, then tap **Announce**. Every phone on an older version shows "Update available" on its next open. Phones also check GitHub Releases daily as a fallback.
+4. GitHub runs the tests, builds and signs the APK, and publishes it at https://github.com/rehank1/qarib/releases/latest, together with the silent-update bundle (`qarib-web-<version>.zip`) and `qarib-web.json` (about 3 minutes).
+5. **That's it: phones update themselves.** On their next open, apps from v1.1.0 on download the new version in the background. The updater checks its SHA-256 and switches over on the following open, and a version that fails to start is rolled back automatically. Nobody downloads anything.
+
+**Only when the Android shell changes** (a new plugin or permission, which is rare):
+1. Raise `qarib.minNative` in `package.json` to the new version before tagging.
+2. After the release, announce it in the dashboard (**Announce an update**). Older apps then show "Update available" and the person installs the APK once.
 
 Keep `.keys/` (the signing key) backed up offline; every release must be signed with it.
 
@@ -53,7 +57,7 @@ Keep `.keys/` (the signing key) backed up offline; every release must be signed 
 |---|---|
 | An imam publishes jamaat times | Instantly; pull to refresh on Masjids |
 | Masjid list for an area | When its area loads, then weekly |
-| A new app version | After you announce it: an in-app notice on next open |
+| A new app version | Silently: downloaded on next open, applied on the open after (from v1.1.0) |
 
 ## 4. Security
 
