@@ -3,6 +3,7 @@
 import { h, icon, toast } from '../../core/dom.js';
 import { isEmail, passwordProblem, timesProblems } from '../../core/validate.js';
 import { dashboard } from './dashboard.js';
+import { addMasjidForm } from './add-masjid.js';
 import { formatDistance } from '../../core/geo.js';
 
 export function portalView(ctx) {
@@ -70,6 +71,7 @@ function signedIn(ctx, user) {
       x.status === 'pending' ? h('span', { class: 'pill warn', text: 'Waiting for approval' }) : h('span', { class: 'pill err', text: 'Not approved' })));
   }
   if (!p.mine.length) out.append(h('p', { class: 'muted', text: 'You do not manage a masjid yet. Choose yours below.' }));
+  out.append(p.adding ? addMasjidForm(ctx) : h('button', { class: 'btn block', type: 'button', onclick: () => ctx.setPortal({ adding: true }) }, icon('mosque'), 'Add a masjid that is not listed'));
   out.append(claimCard(ctx));
   return out;
 }

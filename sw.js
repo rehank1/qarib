@@ -10,7 +10,8 @@ const SHELL = [
   './src/features/prayer/praytimes.js', './src/features/prayer/view.js', './src/features/prayer/salawat.js',
   './src/features/masjids/overpass.js', './src/features/masjids/view.js',
   './src/features/location/places.js', './src/features/location/view.js',
-  './src/features/portal/view.js',
+  './src/features/portal/view.js', './src/features/portal/add-masjid.js',
+  './vendor/leaflet/leaflet-src.esm.js', './vendor/leaflet/leaflet.css',
 ];
 
 self.addEventListener('install', (e) => {

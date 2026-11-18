@@ -48,6 +48,8 @@ function build(ctx) {
         h('tbody', {}, ...s.topMasjids.map((m) => h('tr', {}, h('th', { scope: 'row', text: cleanText(m.name, 60) }), h('td', { text: n(m.directions) }), h('td', { text: n(m.views) }))))))
       : h('p', { class: 'muted small', text: 'No visits yet.' }),
 
+    h('h3', { text: `New masjids to check (${n((p.submissions || []).length)})` }),
+    ...((p.submissions || []).length ? p.submissions.map((s) => submissionRow(ctx, s)) : [h('p', { class: 'muted small', text: 'Nothing waiting.' })]),
     h('h3', { text: `Imam requests (${n(pending.length)})` }),
     ...(pending.length ? pending.map((c) => claimRow(ctx, c)) : [h('p', { class: 'muted small', text: 'Nothing waiting.' })]),
     h('h3', { text: `Approved imams (${n(approved.length)})` }),
@@ -77,6 +79,17 @@ function updateForm(ctx) {
     finally { btn.disabled = false; }
   });
   return form;
+}
+
+function submissionRow(ctx, s) {
+  const map = `https://www.google.com/maps/search/?api=1&query=${Number(s.lat).toFixed(6)},${Number(s.lng).toFixed(6)}`;
+  return h('div', { class: 'claim' },
+    h('div', { class: 'stack' }, h('b', { text: cleanText(s.name, 80) }), h('span', { class: 'small', text: cleanText(s.address, 200) }),
+      h('span', { class: 'muted small', text: `${cleanText(s.email, 80)} · ${ago(s.created_at)}` }),
+      h('a', { class: 'link small', href: map, target: '_blank', rel: 'noopener noreferrer', text: 'Check the pin on the map' })),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn', type: 'button', onclick: () => ctx.decideSubmission(s, 'rejected') }, 'Reject'),
+      h('button', { class: 'btn primary', type: 'button', onclick: () => ctx.decideSubmission(s, 'approved') }, icon('check'), 'Approve')));
 }
 
 function claimRow(ctx, c) {

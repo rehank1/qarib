@@ -163,3 +163,12 @@ details.settings[open] summary{margin-bottom:var(--s2)}
 main:focus-visible{outline:none}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (min-width:720px){body{padding-top:var(--s4)}}
+/* add a masjid: map + pin */
+.map{block-size:260px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line-strong);background:var(--surface-2)}
+.map-pin-wrap{background:none;border:0}
+.map-pin{inline-size:28px;block-size:40px;background:var(--gold);clip-path:path('M14 0C6.3 0 0 6.2 0 13.9 0 24.3 14 40 14 40s14-15.7 14-26.1C28 6.2 21.7 0 14 0z');box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.two{display:grid;grid-template-columns:1fr 8.5em;gap:var(--s3)}
+.suggestion{display:grid;gap:2px}
+.sugg-title{font-weight:600}
+.sugg-sub{font-size:var(--step--1);color:var(--muted)}
+.center{text-align:center}

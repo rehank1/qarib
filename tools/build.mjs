@@ -7,7 +7,7 @@ import { CONFIG } from '../src/config.js';
 execSync('node --test tests/core.test.js tests/security.test.js tests/db.test.js', { stdio: 'inherit' });
 await rm('www', { recursive: true, force: true });
 await mkdir('www');
-for (const p of ['index.html', 'manifest.webmanifest', 'sw.js', 'styles', 'src', 'icons']) await cp(p, `www/${p}`, { recursive: true });
+for (const p of ['index.html', 'manifest.webmanifest', 'sw.js', 'styles', 'src', 'icons', 'vendor']) await cp(p, `www/${p}`, { recursive: true });
 await copyFile('hosting/_headers', 'www/_headers');
 
 // Pin the CSP to YOUR Supabase project (instead of any *.supabase.co), and drop the GitHub update check if it is off.

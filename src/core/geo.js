@@ -30,6 +30,8 @@ export function directionsUrl(to, mode = 'walking') {
 
 /** The device location, rounded. Rejects with a readable message. */
 export function currentPosition({ timeout = 12000 } = {}) {
+  const G = window.Capacitor?.Plugins?.Geolocation; // Android app: the native location service (the WebView's own is unreliable)
+  if (G) return nativePosition(G, timeout);
   return new Promise((resolve, reject) => {
     if (!('geolocation' in navigator)) return reject(new Error('This device cannot share its location. Search for your city instead.'));
     navigator.geolocation.getCurrentPosition(
@@ -38,4 +40,19 @@ export function currentPosition({ timeout = 12000 } = {}) {
       { enableHighAccuracy: false, timeout, maximumAge: 5 * 60e3 },
     );
   });
+}
+
+async function nativePosition(G, timeout) {
+  let perm;
+  try { perm = await G.checkPermissions(); if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') perm = await G.requestPermissions({ permissions: ['coarseLocation'] }); }
+  catch { throw new Error('Location is turned off on this phone. Turn on Location in quick settings, or search for your city.'); }
+  if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') {
+    throw new Error('Qarīb is not allowed to use your location. Allow it in Settings → Apps → Qarīb → Permissions, or search for your city.');
+  }
+  try {
+    const p = await G.getCurrentPosition({ enableHighAccuracy: false, timeout, maximumAge: 5 * 60e3 });
+    return coarse({ lat: p.coords.latitude, lng: p.coords.longitude });
+  } catch (e) {
+    throw new Error(/disabled|services/i.test(String(e?.message)) ? 'Location is turned off on this phone. Turn on Location in quick settings, or search for your city.' : 'Could not find your location. Try again outdoors, or search for your city.');
+  }
 }

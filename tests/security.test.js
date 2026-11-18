@@ -94,3 +94,11 @@ test('database: owner set by hand only, public reads never include who edited, n
 test('dev server listens on this computer only', () => {
   assert.match(readFileSync(join(ROOT, 'tools/serve.mjs'), 'utf8'), /listen\(port, '127\.0\.0\.1'/);
 });
+
+test('vendored Leaflet keeps the Trusted Types patch, and the map never enables controls that write HTML strings', () => {
+  const lib = readFileSync(join(ROOT, 'vendor/leaflet/leaflet-src.esm.js'), 'utf8');
+  assert.ok(lib.includes('QARIB PATCH') && !lib.includes("div.innerHTML = '<svg/>'"));
+  const map = readFileSync(join(ROOT, 'src/features/portal/add-masjid.js'), 'utf8');
+  assert.match(map, /zoomControl: false/); assert.match(map, /attributionControl: false/);
+  assert.ok(!/bindPopup|bindTooltip|control\.layers|control\.scale/.test(map));
+});

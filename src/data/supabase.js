@@ -110,6 +110,9 @@ export function supabaseBackend({ url, anonKey, store }) {
     stats: () => rpc('admin_stats', {}, true),
     pendingClaims: async () => { const r = await rpc('admin_claims', {}, true); return Array.isArray(r) ? r : []; },
     decideClaim: (userId, osmId, status, hideTimes = false) => rpc('decide_claim', { p_user: userId, p_osm: osmId, p_status: status, p_hide: hideTimes }, true),
+    submitMasjid: (f) => rpc('submit_masjid', { p_name: f.name, p_street: f.street, p_area: f.area, p_city: f.city, p_state: f.state, p_pincode: f.pincode, p_lat: f.lat, p_lng: f.lng }, true),
+    pendingSubmissions: async () => { const r = await rpc('admin_submissions', {}, true); return Array.isArray(r) ? r : []; },
+    decideSubmission: (id, status) => rpc('decide_submission', { p_id: id, p_status: status }, true),
     setUpdateNotice: (version, message, url) => rpc('set_update_notice', { p_version: version, p_message: message, p_url: url }, true),
 
     /** The latest app version announced by the owner (anyone may read). */

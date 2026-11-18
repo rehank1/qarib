@@ -19,17 +19,7 @@ export function locationPanel(ctx, { title = 'Find prayer times and masjids near
     finally { useBtn.disabled = false; useBtn.lastChild.textContent = 'Use my location'; }
   });
 
-  const q = h('input', { id: 'city-q', type: 'search', placeholder: 'Search a city or area', autocomplete: 'off', maxlength: '80', enterkeyhint: 'search', 'aria-label': 'City or area' });
-  const go = h('button', { class: 'btn', type: 'submit', 'aria-label': 'Search' }, icon('search'));
-  const form = h('form', { class: 'search', role: 'search' }, q, go);
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault(); err.textContent = ''; go.disabled = true;
-    try {
-      const rows = await searchPlaces(q.value);
-      results.replaceChildren(...(rows.length ? rows.map((r) => h('li', {}, h('button', { type: 'button', onclick: () => ctx.setLocation({ lat: r.lat, lng: r.lng, label: r.short, source: 'search' }) }, r.label))) : [h('li', { class: 'muted small', text: 'No places found. Try a nearby town.' })]));
-    } catch (ex) { err.textContent = ex.message; }
-    finally { go.disabled = false; }
-  });
+  const form = areaSearch({ near: ctx.state.prevLoc, onPick: (r) => ctx.setLocation({ lat: r.lat, lng: r.lng, label: r.label, source: 'search' }), results, err });
 
   const mark = icon('star');
   mark.classList.add('big');
@@ -40,4 +30,29 @@ export function locationPanel(ctx, { title = 'Find prayer times and masjids near
     h('div', { class: 'stack full' }, useBtn, h('p', { class: 'muted small', text: 'or' }), form, results, err,
       ctx.state.prevLoc ? h('button', { class: 'link', type: 'button', onclick: () => ctx.cancelChange() }, `Keep ${ctx.state.prevLoc.label || 'the current location'}`) : null),
   );
+}
+
+/** Type-ahead area search: suggestions appear as you type (title + district/state), tap one to choose it. */
+export function areaSearch({ onPick, near = null, results = h('ul', { class: 'results' }), err = h('p', { class: 'err-text', role: 'alert' }), placeholder = 'Search an area, e.g. Camp, Pune', id = 'city-q' }) {
+  const q = h('input', { id, type: 'search', placeholder, autocomplete: 'off', autocapitalize: 'words', maxlength: '80', enterkeyhint: 'search', role: 'combobox', 'aria-expanded': 'false', 'aria-controls': `${id}-list`, 'aria-label': 'Area or city' });
+  results.id = `${id}-list`; results.setAttribute('role', 'listbox');
+  let seq = 0, timer = 0, rows = [];
+  const show = (list) => {
+    rows = list;
+    q.setAttribute('aria-expanded', String(list.length > 0));
+    results.replaceChildren(...list.map((r) => h('li', { role: 'option' }, h('button', { type: 'button', class: 'suggestion', onclick: () => { q.value = r.title; results.replaceChildren(); onPick(r); } },
+      h('span', { class: 'sugg-title', text: r.title }), r.subtitle ? h('span', { class: 'sugg-sub', text: r.subtitle }) : null))));
+  };
+  q.addEventListener('input', () => {
+    clearTimeout(timer); err.textContent = '';
+    const mine = ++seq, text = q.value;
+    if (text.trim().length < 2) return show([]);
+    timer = setTimeout(async () => {
+      try { const list = await searchPlaces(text, { near }); if (mine === seq) { show(list); if (!list.length) results.replaceChildren(h('li', { class: 'muted small', text: 'No matching area. Try the city name.' })); } }
+      catch (ex) { if (mine === seq) err.textContent = ex.message; }
+    }, 250); // wait for a short pause in typing: fewer requests, no flicker
+  });
+  const form = h('form', { class: 'search', role: 'search' }, q);
+  form.addEventListener('submit', (e) => { e.preventDefault(); if (rows[0]) { results.replaceChildren(); onPick(rows[0]); } });
+  return h('div', { class: 'stack' }, form, results, err);
 }

@@ -156,6 +156,12 @@ const ctx = {
   async signOut() { await backend.signOut(); state.portal = { mode: 'signin', mine: null }; toast('Signed out.'); render(); },
 
   /** Owner dashboard: live numbers, refreshed every 30 s while the Portal is open. */
+  async decideSubmission(s, status) {
+    try { await backend.decideSubmission(s.id, status); toast(status === 'approved' ? 'Added to the directory. Its submitter can now publish its times.' : 'Rejected.'); }
+    catch (e) { toast(e.message, 'error'); }
+    await ctx.refreshDashboard?.();
+  },
+
   async announceUpdate(version, message) {
     await backend.setUpdateNotice(version, message, `https://github.com/${CONFIG.updateRepo}/releases/latest`);
     toast(`Announced. Phones on an older version will be asked to update to ${version}.`);
@@ -165,8 +171,8 @@ const ctx = {
     if (!backend.stats || state.portal.loadingStats) return;
     state.portal.loadingStats = true;
     try {
-      const [stats, claims] = await Promise.all([backend.stats(), backend.pendingClaims()]);
-      state.portal.stats = stats; state.portal.claims = claims; state.portal.statsAt = Date.now(); state.portal.statsError = '';
+      const [stats, claims, subs] = await Promise.all([backend.stats(), backend.pendingClaims(), backend.pendingSubmissions?.() ?? []]);
+      state.portal.stats = stats; state.portal.claims = claims; state.portal.submissions = subs; state.portal.statsAt = Date.now(); state.portal.statsError = '';
     } catch (e) { state.portal.statsError = e.message; state.portal.statsAt = Date.now(); }
     finally { state.portal.loadingStats = false; }
   },

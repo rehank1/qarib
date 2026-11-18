@@ -27,6 +27,7 @@ export function masjidsView(ctx) {
     head,
     m?.error && m.list?.length ? h('p', { class: 'banner', role: 'status', text: `${m.error} Showing the list saved ${ago(m.at)}.` }) : null,
     h('div', { class: 'stack', 'aria-busy': m?.loading ? 'true' : 'false' }, ...body),
+    h('p', { class: 'muted small center' }, 'Masjid missing? ', h('a', { class: 'link', href: '#portal', text: 'Add it', onclick: () => { state.portal.adding = true; } })),
     h('p', { class: 'attrib' }, 'Masjid data © ', h('a', { href: 'https://www.openstreetmap.org/copyright', target: '_blank', rel: 'noopener noreferrer', text: 'OpenStreetMap contributors' })),
   ];
 }
