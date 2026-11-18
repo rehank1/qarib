@@ -9,6 +9,7 @@ import { defaultSettings, APP_METHODS, ASR } from './features/prayer/praytimes.j
 import { nearestMasjids, nearestFrom, revive } from './features/masjids/overpass.js';
 import { createMetrics } from './core/metrics.js';
 import { checkForUpdate, showUpdate } from './core/update.js';
+import { liveUpdate } from './core/live-update.js';
 import { showSalawat } from './features/prayer/salawat.js';
 import { prayerView } from './features/prayer/view.js';
 import { masjidsView } from './features/masjids/view.js';
@@ -235,4 +236,9 @@ metrics.open();
 showSalawat(ctx);
 
 // A newer version announced from the backend (or on GitHub) → an in-app update notice (Android app; the website updates itself)
-if (window.Capacitor) checkForUpdate(store, backend).then((rel) => rel && showUpdate(rel, store));
+if (window.Capacitor) (async () => {
+  const live = await liveUpdate(store); // silent: downloads the new version in the background, applies on next open
+  if (live?.ready) return toast(`Qarīb ${live.ready} is ready. It applies the next time you open the app.`);
+  const rel = await checkForUpdate(store, backend); // only for updates that need a new APK
+  if (rel) showUpdate(rel, store);
+})();

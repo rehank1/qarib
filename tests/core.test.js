@@ -232,3 +232,16 @@ test('a masjid mapped twice (point and outline, same name, a few metres apart) i
   const list = [{ id: 'node/1', name: 'Gulshane Madina Masjid', lat: 19.1010, lng: 73.0 }, { id: 'way/2', name: 'Gulshane Madina Masjid', lat: 19.1011, lng: 73.0001 }, { id: 'node/3', name: 'Noor Masjid', lat: 19.102, lng: 73.0 }];
   assert.deepEqual(nearestFrom(list, me, 3).map((m) => m.id), ['node/1', 'node/3']);
 });
+
+// ---------- silent (live) updates ----------
+import { acceptManifest } from '../src/core/live-update.js';
+test('silent updates: only a newer version, from our own GitHub release, with a SHA-256', () => {
+  const ok = { version: '1.2.0', url: 'https://github.com/rehank1/qarib/releases/download/v1.2.0/qarib-web-1.2.0.zip', sha256: 'a'.repeat(64) };
+  assert.equal(acceptManifest(ok, '1.1.0', 'rehank1/qarib'), true);
+  assert.equal(acceptManifest(ok, '1.2.0', 'rehank1/qarib'), false, 'not newer');
+  assert.equal(acceptManifest({ ...ok, url: 'https://evil.example/qarib-web-1.2.0.zip' }, '1.1.0', 'rehank1/qarib'), false);
+  assert.equal(acceptManifest({ ...ok, url: 'https://github.com/someone/qarib/releases/download/v1.2.0/x.zip' }, '1.1.0', 'rehank1/qarib'), false);
+  assert.equal(acceptManifest({ ...ok, url: 'https://github.com/rehank1/qarib/releases/download/v1.1.9/x.zip' }, '1.1.0', 'rehank1/qarib'), false, 'url must match the version');
+  assert.equal(acceptManifest({ ...ok, sha256: 'nope' }, '1.1.0', 'rehank1/qarib'), false);
+  assert.equal(acceptManifest({ ...ok, version: '99' }, '1.1.0', 'rehank1/qarib'), false);
+});

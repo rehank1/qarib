@@ -1,12 +1,12 @@
 // Offline support: the app shell is cached at install, served cache-first and refreshed in the background.
 // Third-party requests (OpenStreetMap, Supabase) are never cached here: the app keeps its own validated copy.
-const VERSION = 'qarib-v1.2.0'; // bump on every release so phones drop the old cached files
+const VERSION = 'qarib-v1.3.0'; // bump on every release so phones drop the old cached files
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './styles/tokens.css', './styles/app.css', './icons/icon.svg', './icons/icon-192.png',
   './src/app.js', './src/config.js',
   './src/core/dom.js', './src/core/store.js', './src/core/validate.js', './src/core/net.js', './src/core/geo.js', './src/core/format.js',
   './src/data/backend.js', './src/data/supabase.js', './src/data/demo.js',
-  './src/core/metrics.js', './src/core/update.js', './src/features/portal/dashboard.js',
+  './src/core/metrics.js', './src/core/update.js', './src/core/live-update.js', './src/features/portal/dashboard.js',
   './src/features/prayer/praytimes.js', './src/features/prayer/view.js', './src/features/prayer/salawat.js',
   './src/features/masjids/overpass.js', './src/features/masjids/view.js',
   './src/features/location/places.js', './src/features/location/view.js',
