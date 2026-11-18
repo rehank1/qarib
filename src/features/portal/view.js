@@ -3,6 +3,7 @@
 import { h, icon, toast } from '../../core/dom.js';
 import { isEmail, passwordProblem, timesProblems } from '../../core/validate.js';
 import { dashboard } from './dashboard.js';
+import { formatDistance } from '../../core/geo.js';
 
 export function portalView(ctx) {
   const { backend, state } = ctx;
@@ -96,7 +97,7 @@ function editor(ctx, x) {
     const problems = timesProblems(t);
     if (problems.length) { err.textContent = problems.join(' '); return; }
     save.disabled = true; err.textContent = '';
-    try { await ctx.backend.saveTimes(x.osm_id, t); toast(ctx.backend.mode === 'demo' ? 'Saved on this phone (demo).' : 'Published. Worshippers will see the new times.'); ctx.refreshJamaat(); }
+    try { await ctx.backend.saveTimes(x.osm_id, t); toast(ctx.backend.mode === 'demo' ? 'Saved on this phone (demo).' : 'Published. Worshippers will see the new times.'); ctx.showPublished(x.osm_id, t); ctx.refreshJamaat(true); }
     catch (ex) { err.textContent = ex.status === 401 || ex.status === 403 ? 'You are not allowed to change this masjid. Sign in again, or ask the app owner to approve you.' : ex.message; }
     finally { save.disabled = false; }
   });
@@ -104,22 +105,31 @@ function editor(ctx, x) {
 }
 
 function claimCard(ctx) {
-  const list = (ctx.state.masjids?.list || []).filter((m) => !ctx.state.portal.mine.some((x) => x.osm_id === m.id));
-  if (!ctx.state.loc || !list.length) {
+  const p = ctx.state.portal, loc = ctx.state.loc;
+  if (!loc) {
     return h('section', { class: 'card' }, h('h2', { text: 'Manage a masjid' }),
-      h('p', { class: 'muted', text: 'Open the Masjids tab near your masjid first; it will then appear here to choose.' }),
-      h('a', { class: 'btn', href: '#masjids', text: 'Go to Masjids' }));
+      h('p', { class: 'muted', text: 'First set your area on the Prayer tab (your location or a city search); the masjids around it will appear here.' }),
+      h('a', { class: 'btn', href: '#prayer', text: 'Set my area' }));
   }
-  const sel = h('select', { id: 'claim-sel' }, ...list.map((m) => h('option', { value: m.id }, m.name)));
+  if (p.claimableFor !== `${loc.lat},${loc.lng}`) { queueMicrotask(() => ctx.loadClaimable()); return h('div', { class: 'card skeleton', 'aria-label': 'Loading nearby masjids' }); }
+  const list = (p.claimable || []).filter((m) => !p.mine.some((x) => x.osm_id === m.id));
+  if (!list.length) {
+    return h('section', { class: 'card' }, h('h2', { text: 'Manage a masjid' }),
+      h('p', { class: 'muted', text: `No masjids found around ${loc.label || 'your area'}. Change your area on the Prayer tab to where the masjid is.` }),
+      h('a', { class: 'btn', href: '#prayer', text: 'Change area' }));
+  }
+  const sel = h('select', { id: 'claim-sel' }, ...list.map((m) => h('option', { value: m.id }, `${m.name} · ${formatDistance(m.km)}`)));
   const btn = h('button', { class: 'btn primary block', type: 'button', text: ctx.backend.mode === 'demo' ? 'Manage this masjid' : 'Request to manage' });
   btn.addEventListener('click', async () => {
     const m = list.find((x) => x.id === sel.value);
     btn.disabled = true;
-    try { await ctx.backend.claim(m.id, m.name); toast(ctx.backend.mode === 'demo' ? 'Added.' : 'Request sent. You can publish times once it is approved.'); ctx.setPortal({ mine: null }); }
+    try { await ctx.backend.claim(m.id, m.name); toast(ctx.backend.mode === 'demo' || ctx.backend.user()?.isOwner ? 'Added. You can publish its times now.' : 'Request sent. You can publish times once it is approved.'); ctx.setPortal({ mine: null }); }
     catch (ex) { toast(/duplicate|23505/.test(ex.message + ex.code) ? 'You already asked for this masjid.' : ex.message, 'error'); }
     finally { btn.disabled = false; }
   });
   return h('section', { class: 'card' }, h('h2', { text: 'Manage a masjid' }),
     h('p', { class: 'muted small', text: ctx.backend.mode === 'demo' ? 'In demo mode you are approved at once.' : 'The app owner checks each request before you can publish times, so nobody can post false times for a masjid.' }),
-    h('div', { class: 'field' }, h('label', { for: 'claim-sel', text: 'Nearby masjid' }), sel), btn);
+    h('div', { class: 'field' }, h('label', { for: 'claim-sel', text: `Masjids near ${loc.label || 'you'} (nearest first)` }), sel),
+    h('p', { class: 'muted small' }, 'Not listed? ', h('a', { class: 'link', href: '#prayer', text: 'Change your area' }), ' to where the masjid is. If it is missing from the map, add it on OpenStreetMap.'),
+    btn);
 }

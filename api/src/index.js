@@ -144,7 +144,7 @@ async function getTimes(req, env, url, ctx) {
   if (hit) return hit;
   const { results } = await env.DB.prepare(`SELECT osm_id, fajr, dhuhr, asr, maghrib, isha, jumuah, updated_at FROM prayer_times WHERE osm_id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all();
   const times = Object.fromEntries(results.map((r) => [r.osm_id, { fajr: r.fajr, dhuhr: r.dhuhr, asr: r.asr, maghrib: r.maghrib, isha: r.isha, jumuah: r.jumuah || '', updatedAt: iso(r.updated_at) }]));
-  const res = json({ times }, 200, { 'cache-control': 'public, max-age=60' }); // updated_by is never sent
+  const res = json({ times }, 200, { 'cache-control': 'public, max-age=30' }); // updated_by is never sent; 30 s at the edge
   if (cache) ctx?.waitUntil?.(cache.put(key, res.clone()));
   return res;
 }
@@ -217,7 +217,9 @@ async function claim(req, env) {
   if (!isOsmId(b.osm_id) || !name) throw new HttpError(400, 'bad_input');
   const pending = await env.DB.prepare("SELECT COUNT(*) AS n FROM masjid_admins WHERE user_id = ? AND status = 'pending'").bind(u.id).first();
   if (pending.n >= 5) throw new HttpError(429, 'too_many_pending', 'Too many pending requests. Wait for approval first.');
-  const res = await env.DB.prepare('INSERT OR IGNORE INTO masjid_admins (user_id, osm_id, masjid_name, status, created_at) VALUES (?, ?, ?, ?, ?)')
+  const res = await env.DB.prepare(`INSERT INTO masjid_admins (user_id, osm_id, masjid_name, status, created_at) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, osm_id) DO UPDATE SET status = excluded.status, masjid_name = excluded.masjid_name, created_at = excluded.created_at
+    WHERE masjid_admins.status = 'rejected'`) // a rejected request may be asked again; pending or approved is a duplicate
     .bind(u.id, b.osm_id, name, u.is_owner ? 'approved' : 'pending', now()).run();
   if (!res.meta?.changes) throw new HttpError(409, 'duplicate', 'You already asked for this masjid.');
   return json({ ok: true }, 201);
@@ -269,13 +271,15 @@ async function stats(req, env) {
 async function claims(req, env) {
   await owner(req, env);
   if (req.method === 'GET') {
-    const { results } = await env.DB.prepare("SELECT a.user_id, u.email, a.osm_id, a.masjid_name, a.created_at FROM masjid_admins a JOIN users u ON u.id = a.user_id WHERE a.status = 'pending' ORDER BY a.created_at LIMIT 50").all();
+    const { results } = await env.DB.prepare("SELECT a.user_id, u.email, a.osm_id, a.masjid_name, a.status, a.created_at FROM masjid_admins a JOIN users u ON u.id = a.user_id WHERE a.status IN ('pending', 'approved') ORDER BY a.status DESC, a.created_at LIMIT 200").all();
     return json({ claims: results.map((r) => ({ ...r, created_at: iso(r.created_at) })) });
   }
   const b = await readBody(req);
   if (!Number.isInteger(b.user_id) || !isOsmId(b.osm_id) || !['approved', 'rejected'].includes(b.status)) throw new HttpError(400, 'bad_input');
   const res = await env.DB.prepare('UPDATE masjid_admins SET status = ? WHERE user_id = ? AND osm_id = ?').bind(b.status, b.user_id, b.osm_id).run();
   if (!res.meta?.changes) throw new HttpError(404, 'not_found');
+  // "Remove and hide times": take the masjid's published times down too (the audit history keeps them)
+  if (b.status === 'rejected' && b.hideTimes === true) await env.DB.prepare('DELETE FROM prayer_times WHERE osm_id = ?').bind(b.osm_id).run();
   return json({ ok: true });
 }
 

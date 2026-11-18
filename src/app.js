@@ -49,7 +49,7 @@ const state = {
 
 const metrics = createMetrics({ store, backend, enabled: () => state.settings.metrics });
 let ticks = [];
-let jamaatFetched = false;
+let jamaatAt = 0; // when published times were last fetched
 
 const ctx = {
   state, store, backend, metrics,
@@ -88,7 +88,7 @@ const ctx = {
     // after a failure here, only the user (Try again) or coming back online retries: never an automatic loop
     if (m?.error && m.errorFor && distanceKm(m.errorFor, loc) < 0.3 && !force) return;
     const fresh = m?.list && m.origin && distanceKm(m.origin, loc) < 0.3 && Date.now() - m.at < DAY;
-    if (fresh && !force) { if (!jamaatFetched) ctx.refreshJamaat(); return; }
+    if (fresh && !force) { ctx.refreshJamaat(); return; }
     state.masjids = { ...(m?.origin && distanceKm(m.origin, loc) < 0.3 ? m : {}), loading: true, error: '' };
     render();
     try {
@@ -98,7 +98,7 @@ const ctx = {
       if (!list) list = await nearestMasjids(loc, { limit: CONFIG.masjidLimit }); // fall back to OpenStreetMap directly
       state.masjids = { origin: { lat: loc.lat, lng: loc.lng }, list, at: Date.now() };
       store.set('masjids', state.masjids, 7 * DAY);
-      await ctx.refreshJamaat();
+      await ctx.refreshJamaat(true); // a fresh list always gets fresh times
     } catch (e) {
       state.masjids = { ...state.masjids, loading: false, error: e.message || 'Could not load masjids.', errorFor: { lat: loc.lat, lng: loc.lng } };
     }
@@ -106,26 +106,48 @@ const ctx = {
   },
 
   /** Published jamaat times for the listed masjids and the ones this authority manages. */
-  async refreshJamaat() {
+  async refreshJamaat(force = false) {
+    if (!force && Date.now() - jamaatAt < 2 * 60e3) return; // at most every 2 min unless asked
     const ids = [...new Set([...(state.masjids?.list || []).map((x) => x.id), ...(state.portal.mine || []).map((x) => x.osm_id)])];
     if (!ids.length) return;
-    jamaatFetched = true;
+    jamaatAt = Date.now();
     try {
       state.jamaat = cleanTimesMap(await backend.times(ids));
-      store.set('jamaat', state.jamaat, 6 * HOUR);
+      store.set('jamaat', state.jamaat, 7 * DAY); // offline: keep showing them, with their "Updated …" date
       render();
     } catch { /* keep the cached times; the card shows when they were updated */ }
   },
 
   setPortal(patch) { Object.assign(state.portal, patch); render(); },
+
+  /** Show an imam's just-published times immediately on their own phone (the server copy follows within a minute). */
+  showPublished(osmId, t) {
+    const clean = cleanTimesMap({ [osmId]: { ...t, updatedAt: new Date().toISOString(), verified: backend.mode === 'live', demo: backend.mode === 'demo' } });
+    state.jamaat = { ...state.jamaat, ...clean };
+    store.set('jamaat', state.jamaat, 7 * DAY);
+  },
+
+  /** Masjids an imam can choose from: the 25 nearest (not just the 3 shown to worshippers). */
+  async loadClaimable() {
+    const loc = state.loc;
+    if (!loc || state.portal.loadingClaimable) return;
+    state.portal.loadingClaimable = true;
+    try {
+      state.portal.claimable = backend.masjids ? nearestFrom(await backend.masjids(loc), loc, 25) : (state.masjids?.list || []);
+    } catch { state.portal.claimable = state.masjids?.list || []; }
+    finally { state.portal.claimableFor = `${loc.lat},${loc.lng}`; state.portal.loadingClaimable = false; if (tab() === 'portal') render(); }
+  },
   async loadMine() {
     if (state.portal.loadingMine) return;
     state.portal.loadingMine = true;
-    try { state.portal.mine = await backend.myMasjids(); ctx.refreshJamaat(); }
-    catch (e) {
-      if (e.status === 401) await backend.signOut();
-      toast(e.message, 'error');
-      state.portal.mine = [];
+    try {
+      // role and approvals can change on the server at any time: re-read both, never trust what was cached at sign-in
+      const [mine] = await Promise.all([backend.myMasjids(), backend.refreshUser?.()]);
+      state.portal.mine = mine;
+      ctx.refreshJamaat(true);
+    } catch (e) {
+      if (e.status === 401) { await backend.signOut(); state.portal = { mode: 'signin', mine: null }; toast('Your session ended. Please sign in again.'); }
+      else { toast(e.message, 'error'); state.portal.mine = []; }
     } finally { state.portal.loadingMine = false; render(); }
   },
   async signOut() { await backend.signOut(); state.portal = { mode: 'signin', mine: null }; toast('Signed out.'); render(); },
@@ -138,12 +160,12 @@ const ctx = {
       const [stats, claims] = await Promise.all([backend.stats(), backend.pendingClaims()]);
       state.portal.stats = stats; state.portal.claims = claims; state.portal.statsAt = Date.now(); state.portal.statsError = '';
     } catch (e) { state.portal.statsError = e.message; state.portal.statsAt = Date.now(); }
-    finally { state.portal.loadingStats = false; if (tab() === 'portal') render(); }
+    finally { state.portal.loadingStats = false; }
   },
-  async decideClaim(c, status) {
-    try { await backend.decideClaim(c.user_id, c.osm_id, status); toast(status === 'approved' ? 'Approved.' : 'Rejected.'); }
+  async decideClaim(c, status, hideTimes = false) {
+    try { await backend.decideClaim(c.user_id, c.osm_id, status, hideTimes); toast(status === 'approved' ? 'Approved.' : c.status === 'approved' ? (hideTimes ? 'Removed, and their times are hidden.' : 'Removed. They can no longer publish times.') : 'Rejected.'); if (hideTimes) ctx.refreshJamaat(true); }
     catch (e) { toast(e.message, 'error'); }
-    ctx.loadStats();
+    await ctx.refreshDashboard?.();
   },
 };
 
@@ -161,9 +183,17 @@ function render() {
   document.querySelectorAll('.tabbar a').forEach((a) => (a.dataset.tab === name ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
 }
 
-addEventListener('hashchange', () => { render(); scrollTo({ top: 0 }); main.focus({ preventScroll: true }); });
+addEventListener('hashchange', () => {
+  if (tab() === 'portal' && backend.user()) state.portal.mine = null; // re-check approvals and role on every visit
+  render(); scrollTo({ top: 0 }); main.focus({ preventScroll: true });
+});
 setInterval(() => { if (!document.hidden) ticks.forEach((f) => f()); }, 1000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); }); // the day may have changed
+document.addEventListener('visibilitychange', () => { // back in the foreground: the day may have changed, and imams may have published
+  if (document.hidden) return;
+  if (tab() === 'portal' && backend.user()) state.portal.mine = null;
+  if (tab() === 'masjids') ctx.refreshJamaat();
+  render();
+});
 
 // ---------- theme: dark by default (night-time use, OLED-friendly), remembered ----------
 const themeBtn = document.getElementById('theme-btn');

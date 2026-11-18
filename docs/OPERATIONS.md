@@ -72,7 +72,7 @@ GitHub then runs the tests, builds and signs the APK, and publishes **Qarib-v1.0
 
 | What changed | How it reaches users |
 |---|---|
-| Jamaat times | **Instantly.** Imams publish in the Portal and phones fetch the new times (cached at most 60 s on the server). No app update. |
+| Jamaat times | **Instantly.** Imams publish in the Portal and phones fetch the new times (cached at most 30 s on the server; the imam's own phone shows them at once). No app update. |
 | Nearby masjid list | **Automatically.** Refreshed from OpenStreetMap at most weekly per area. |
 | The API (bug fixes, limits) | **Instantly** for everyone when you deploy the Worker. No app update. |
 | The app itself (screens, features) | **New release.** Tag a version as in section 2. Phones check GitHub once a day and show "Version 1.0.1 is available · Download the update"; the user taps, downloads and installs over the old version, keeping their settings. |
@@ -121,3 +121,31 @@ Sign in to the Portal with the owner account. The dashboard refreshes every 30 s
 - **Never stored:** the phone's install ID itself, only a hash that changes daily.
 
 Users can turn usage counts off in Settings → Usage counts.
+
+## 6. Test the whole thing on your PC
+
+Run the real API code with a local database and sample Pune masjids, plus the app connected to it:
+
+```bash
+npm run dev:api
+```
+
+```bash
+npm run serve:live
+```
+
+Then open http://localhost:4181:
+1. Create an account in the Portal.
+2. Make it the owner:
+   ```bash
+   npm run dev:owner -- you@example.com
+   ```
+3. Use a second account as an imam.
+
+The local database is `.dev/qarib.sqlite`, which is git-ignored; delete it to start again.
+
+**Scenarios tested end to end on 18 November 2026:**
+- **Imam:** signup (weak password and bad email explained), duplicate email, wrong password and unknown email (same message), lockout after 5 tries, request a masjid, a pending imam can't publish (even via the API), approval, out-of-order times refused, publish, then removal (with or without hiding their times) and asking again.
+- **Owner:** the dashboard appears without signing in again, approve and remove imams, and the live refresh doesn't disturb a form being filled in.
+- **Worshipper:** sees published times, sees an update on refresh, and keeps the saved list and times when the API is down.
+- **Sessions:** an expired session asks the user to sign in again, and signing out invalidates the token on the server.

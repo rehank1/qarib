@@ -10,7 +10,10 @@
     "build": "node tools/build.mjs",
     "cap:add": "npx cap add android",
     "cap:sync": "npm run build && npx cap sync",
-    "android": "npm run cap:sync && npx cap open android"
+    "android": "npm run cap:sync && npx cap open android",
+    "dev:api": "node tools/dev-api.mjs --fake-osm",
+    "serve:live": "node tools/serve.mjs . 4181 http://localhost:8787",
+    "dev:owner": "node tools/dev-api.mjs --owner"
   },
   "devDependencies": {
     "@capacitor/android": "^7.0.0",

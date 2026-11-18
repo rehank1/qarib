@@ -13,7 +13,8 @@ export async function clientKey(email, password) {
 
 export function apiBackend({ url, store }) {
   const base = url.replace(/\/+$/, '');
-  if (!/^https:\/\/[a-z0-9.-]+$/i.test(base)) throw new Error('apiUrl must be an https origin, e.g. https://qarib-api.example.workers.dev');
+  // https only, except a local development API on this computer (tools/dev-api.mjs)
+  if (!/^https:\/\/[a-z0-9.-]+$/i.test(base) && !/^http:\/\/(localhost|127\.0\.0\.1):\d{2,5}$/.test(base)) throw new Error('apiUrl must be an https origin, e.g. https://qarib-api.example.workers.dev');
   const s0 = store.get('session');
   let session = s0 && /^[A-Za-z0-9_-]{43}$/.test(s0.token) && typeof s0.user?.email === 'string' && s0.expiresAt * 1000 > Date.now() ? s0 : null;
 
@@ -21,11 +22,12 @@ export function apiBackend({ url, store }) {
     session = s?.token ? { token: s.token, expiresAt: s.expiresAt, user: { email: s.user.email, isOwner: !!s.user.isOwner } } : null;
     session ? store.set('session', session, Math.max(0, session.expiresAt * 1000 - Date.now())) : store.del('session');
   };
-  async function call(path, { method = 'GET', body, auth = false } = {}) {
+  async function call(path, { method = 'GET', body, auth = false, cache } = {}) {
     if (auth && !session) throw new NetError('Please sign in.', { status: 401, code: 'signed_out' });
     try {
       return await fetchJSON(base + path, {
         method,
+        ...(cache ? { cache } : {}),
         headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(auth ? { authorization: `Bearer ${session.token}` } : {}) },
         body: body ? JSON.stringify(body) : undefined,
       });
@@ -43,7 +45,7 @@ export function apiBackend({ url, store }) {
     async times(ids) {
       const ok = ids.filter(isOsmId);
       if (!ok.length) return {};
-      const r = await call(`/v1/times?ids=${ok.map(encodeURIComponent).join(',')}`);
+      const r = await call(`/v1/times?ids=${ok.map(encodeURIComponent).join(',')}`, { cache: 'no-cache' }); // always ask; the edge cache keeps it cheap
       const out = {};
       for (const [id, t] of Object.entries(r?.times || {})) out[id] = { ...t, verified: true };
       return out;
@@ -54,6 +56,13 @@ export function apiBackend({ url, store }) {
     async signOut() { const had = session; if (had) await call('/v1/logout', { method: 'POST', auth: true }).catch(() => {}); save(null); },
     async resetPassword() { throw new Error('Ask the app owner to reset your account.'); },
 
+    /** Re-read the account from the server (role changes take effect without signing in again). */
+    async refreshUser() {
+      if (!session) return null;
+      const me = await call('/v1/me', { auth: true });
+      save({ ...session, user: { email: String(me?.email || session.user.email), isOwner: !!me?.isOwner } });
+      return session?.user || null;
+    },
     async myMasjids() { return (await call('/v1/my/masjids', { auth: true }))?.masjids || []; },
     async claim(osmId, name) { await call('/v1/claims', { method: 'POST', auth: true, body: { osm_id: osmId, masjid_name: String(name).slice(0, 80) } }); },
     async saveTimes(osmId, t) {
@@ -63,8 +72,8 @@ export function apiBackend({ url, store }) {
 
     // owner only (the server checks)
     stats: () => call('/v1/admin/stats', { auth: true }),
-    pendingClaims: async () => (await call('/v1/admin/claims', { auth: true }))?.claims || [],
-    decideClaim: (userId, osmId, status) => call('/v1/admin/claims', { method: 'POST', auth: true, body: { user_id: userId, osm_id: osmId, status } }),
+    pendingClaims: async () => (await call('/v1/admin/claims', { auth: true }))?.claims || [], // pending and approved
+    decideClaim: (userId, osmId, status, hideTimes = false) => call('/v1/admin/claims', { method: 'POST', auth: true, body: { user_id: userId, osm_id: osmId, status, hideTimes } }),
 
     /** Anonymous usage counts. Fire-and-forget; keepalive lets it finish while the app closes. */
     sendEvents(install, events) {

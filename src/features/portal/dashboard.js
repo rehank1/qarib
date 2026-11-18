@@ -6,11 +6,24 @@ import { cleanText } from '../../core/validate.js';
 
 const n = (v) => (Number.isFinite(+v) ? Number(v).toLocaleString() : '0');
 
+/**
+ * The dashboard panel. It refreshes itself every 30 s by replacing only its own contents, so anything else on the
+ * Portal screen (for example the jamaat-times form the owner may be filling in) is never redrawn or lost.
+ */
 export function dashboard(ctx) {
-  const p = ctx.state.portal;
+  const wrap = h('div', { class: 'dash-wrap' }, build(ctx));
   let tick = 0;
-  ctx.onTick(() => { if (++tick >= 30 || !p.statsAt) { tick = 0; ctx.loadStats(); } }); // live: every 30 s
+  const refresh = async () => { await ctx.loadStats(); if (wrap.isConnected) wrap.replaceChildren(build(ctx)); };
+  if (!ctx.state.portal.statsAt) queueMicrotask(refresh);
+  ctx.onTick(() => { if (++tick >= 30) { tick = 0; refresh(); } }); // live: every 30 s
+  ctx.refreshDashboard = refresh; // after Approve / Reject / Remove
+  return wrap;
+}
+
+function build(ctx) {
+  const p = ctx.state.portal;
   const s = p.stats;
+  const pending = (p.claims || []).filter((c) => c.status !== 'approved'), approved = (p.claims || []).filter((c) => c.status === 'approved');
   if (!s) return h('section', { class: 'card' }, h('h2', { text: 'Dashboard' }), h('p', { class: 'muted', text: p.statsError || 'Loading live numbers…' }));
 
   const tiles = [['Active today', s.today.active], ['App opens today', s.today.opens], ['Directions today', s.today.directions], ['Masjids with times', s.totals.published]];
@@ -35,8 +48,10 @@ export function dashboard(ctx) {
         h('tbody', {}, ...s.topMasjids.map((m) => h('tr', {}, h('th', { scope: 'row', text: cleanText(m.name, 60) }), h('td', { text: n(m.directions) }), h('td', { text: n(m.views) }))))))
       : h('p', { class: 'muted small', text: 'No visits yet.' }),
 
-    h('h3', { text: `Imam requests (${n(p.claims?.length || 0)})` }),
-    ...(p.claims?.length ? p.claims.map((c) => claimRow(ctx, c)) : [h('p', { class: 'muted small', text: 'Nothing waiting.' })]),
+    h('h3', { text: `Imam requests (${n(pending.length)})` }),
+    ...(pending.length ? pending.map((c) => claimRow(ctx, c)) : [h('p', { class: 'muted small', text: 'Nothing waiting.' })]),
+    h('h3', { text: `Approved imams (${n(approved.length)})` }),
+    ...(approved.length ? approved.map((c) => approvedRow(ctx, c)) : [h('p', { class: 'muted small', text: 'None yet.' })]),
     h('p', { class: 'muted small', text: `${n(s.totals.authorities)} imam accounts · ${n(s.totals.updates7d)} time updates this week` }),
   );
 }
@@ -47,6 +62,23 @@ function claimRow(ctx, c) {
     h('div', { class: 'row' },
       h('button', { class: 'btn', type: 'button', onclick: () => ctx.decideClaim(c, 'rejected') }, 'Reject'),
       h('button', { class: 'btn primary', type: 'button', onclick: () => ctx.decideClaim(c, 'approved') }, icon('check'), 'Approve')));
+}
+
+/** Remove an approved imam: two taps (no browser dialog), so it can't happen by accident. */
+function approvedRow(ctx, c) {
+  const twoTap = (label, armed, run) => {
+    const b = h('button', { class: 'btn', type: 'button', text: label });
+    b.addEventListener('click', () => {
+      if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = armed; setTimeout(() => { delete b.dataset.armed; b.textContent = label; }, 4000); return; }
+      run();
+    });
+    return b;
+  };
+  return h('div', { class: 'claim' },
+    h('div', { class: 'stack' }, h('b', { text: cleanText(c.masjid_name, 80) }), h('span', { class: 'muted small', text: cleanText(c.email, 80) })),
+    h('div', { class: 'row' },
+      twoTap('Remove', 'Tap again to remove', () => ctx.decideClaim(c, 'rejected')),
+      twoTap('Remove and hide times', 'Tap again: hide their times too', () => ctx.decideClaim(c, 'rejected', true))));
 }
 
 function lastDays(k) {

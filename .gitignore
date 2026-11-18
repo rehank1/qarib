@@ -8,6 +8,7 @@ ios/App/Pods/
 *.p12
 *.mobileprovision
 .keys/
+.dev/
 android/app/release/
 *.apk
 *.aab

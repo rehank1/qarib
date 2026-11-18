@@ -163,3 +163,54 @@ test('masjid search: one OpenStreetMap lookup per tile, then served from the sha
   assert.deepEqual(a.json.masjids.map((m) => m.name).sort(), ['M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8']); // tags stripped; phone re-sorts by its own position
   assert.equal(b.json.cached, true); assert.equal(calls, 1);
 });
+
+// ---------- found in end-to-end testing (2026-11-18) ----------
+test('owner sees approved imams too, can remove one, and can hide their times; the imam may ask again', async () => {
+  const { call, DB } = setup();
+  const imam = await account(call);
+  const boss = await account(call, 'owner@qarib.app');
+  DB.raw.prepare("UPDATE users SET is_owner = 1 WHERE email = 'owner@qarib.app'").run();
+  const times = { fajr: '05:45', dhuhr: '13:30', asr: '16:45', maghrib: '18:02', isha: '20:15' };
+  await call('POST', '/v1/claims', { token: imam.token, body: { osm_id: 'way/9202', masjid_name: 'Masjid-e-Noor' } });
+  const uid = (await call('GET', '/v1/admin/claims', { token: boss.token })).json.claims[0].user_id;
+  await call('POST', '/v1/admin/claims', { token: boss.token, body: { user_id: uid, osm_id: 'way/9202', status: 'approved' } });
+  assert.equal((await call('PUT', '/v1/times/way/9202', { token: imam.token, body: times })).status, 200);
+
+  const listed = (await call('GET', '/v1/admin/claims', { token: boss.token })).json.claims;
+  assert.deepEqual(listed.map((c) => c.status), ['approved'], 'approved imams are listed for the owner');
+
+  // remove AND hide: the times disappear for worshippers, the audit history keeps them
+  assert.equal((await call('POST', '/v1/admin/claims', { token: boss.token, body: { user_id: uid, osm_id: 'way/9202', status: 'rejected', hideTimes: true } })).status, 200);
+  assert.equal((await call('PUT', '/v1/times/way/9202', { token: imam.token, body: times })).status, 403);
+  assert.deepEqual((await call('GET', '/v1/times?ids=way/9202')).json.times, {});
+  assert.equal(DB.raw.prepare('SELECT COUNT(*) AS n FROM prayer_times_history').get().n, 1);
+
+  // the imam may ask again after a removal, but not twice
+  assert.equal((await call('POST', '/v1/claims', { token: imam.token, body: { osm_id: 'way/9202', masjid_name: 'Masjid-e-Noor' } })).status, 201);
+  assert.equal((await call('POST', '/v1/claims', { token: imam.token, body: { osm_id: 'way/9202', masjid_name: 'Masjid-e-Noor' } })).status, 409);
+  assert.equal((await call('GET', '/v1/my/masjids', { token: imam.token })).json.masjids[0].status, 'pending');
+});
+
+test('plain "Remove" keeps the published times visible; an owner is approved at once for their own masjid', async () => {
+  const { call, DB } = setup();
+  const imam = await account(call);
+  const boss = await account(call, 'owner@qarib.app');
+  DB.raw.prepare("UPDATE users SET is_owner = 1 WHERE email = 'owner@qarib.app'").run();
+  await call('POST', '/v1/claims', { token: boss.token, body: { osm_id: 'node/9101', masjid_name: 'Jama Masjid Camp' } });
+  assert.equal((await call('GET', '/v1/my/masjids', { token: boss.token })).json.masjids[0].status, 'approved');
+  await call('POST', '/v1/claims', { token: imam.token, body: { osm_id: 'way/9202', masjid_name: 'Noor' } });
+  const uid = (await call('GET', '/v1/admin/claims', { token: boss.token })).json.claims.find((c) => c.osm_id === 'way/9202').user_id;
+  await call('POST', '/v1/admin/claims', { token: boss.token, body: { user_id: uid, osm_id: 'way/9202', status: 'approved' } });
+  await call('PUT', '/v1/times/way/9202', { token: imam.token, body: { fajr: '05:45', dhuhr: '13:30', asr: '16:45', maghrib: '18:02', isha: '20:15' } });
+  await call('POST', '/v1/admin/claims', { token: boss.token, body: { user_id: uid, osm_id: 'way/9202', status: 'rejected' } });
+  assert.ok((await call('GET', '/v1/times?ids=way/9202')).json.times['way/9202'], 'times stay unless the owner hides them');
+});
+
+test('times are cached at most 30 s, and /v1/me reports a role change without signing in again', async () => {
+  const { call, DB } = setup();
+  const a = await account(call);
+  assert.equal((await call('GET', '/v1/times?ids=node/1')).headers.get('cache-control'), 'public, max-age=30');
+  assert.equal((await call('GET', '/v1/me', { token: a.token })).json.isOwner, false);
+  DB.raw.prepare('UPDATE users SET is_owner = 1').run();
+  assert.equal((await call('GET', '/v1/me', { token: a.token })).json.isOwner, true);
+});
