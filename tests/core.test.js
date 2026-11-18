@@ -211,16 +211,8 @@ test('a forged demo session in storage does not sign anyone in', () => {
 });
 
 // ---------- live API client pieces ----------
-import { clientKey } from '../src/data/api.js';
 import { nearestFrom } from '../src/features/masjids/overpass.js';
 import { newer } from '../src/core/update.js';
-
-test('client key: 600k-round PBKDF2, salted by email, never the password itself', async () => {
-  const a = await clientKey('imam@x.org', 'velvet lantern monsoon');
-  assert.match(a, /^[A-Za-z0-9_-]{43}$/);
-  assert.notEqual(a, await clientKey('other@x.org', 'velvet lantern monsoon'));
-  assert.equal(a, await clientKey('imam@x.org', 'velvet lantern monsoon'));
-});
 
 test('shared masjid list is re-sorted from the phone, cleaned, and cut to the limit', () => {
   const me = { lat: 18.5, lng: 73.9 };

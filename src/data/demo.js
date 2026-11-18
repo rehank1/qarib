@@ -1,4 +1,4 @@
-// Demo backend: the same interface as api.js, kept entirely on this device so the portal can be tried without a
+// Demo backend: the same interface as supabase.js, kept entirely on this device so the portal can be tried without a
 // server. Nothing here is shown to other users, and the UI labels these times "Demo", never "Verified".
 // Passwords are still handled properly (PBKDF2-SHA256, 600k iterations, salted, constant-time compare, lockout).
 

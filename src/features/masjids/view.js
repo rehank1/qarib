@@ -39,7 +39,7 @@ function card(ctx, x, i) {
 
   const times = t ? h('div', { class: 'stack' },
     h('div', { class: 'row' },
-      t.verified ? h('span', { class: 'pill ok' }, icon('check'), 'Published by the masjid') : h('span', { class: 'pill warn', text: 'Demo · this phone only' }),
+      h('span', { class: 'pill ok' }, icon('check'), 'Published by the masjid'),
       h('span', { class: `small ${stale ? '' : 'muted'}`, text: stale ? `Updated ${ago(t.updatedAt)}, may be out of date` : `Updated ${ago(t.updatedAt)}` })),
     h('div', { class: 'jamaat num', 'aria-label': 'Jamaat times' }, ...['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].map((k) => h('div', {}, k[0].toUpperCase() + k.slice(1), h('b', { text: fmt(t[k]) })))),
     t.jumuah ? h('p', { class: 'small muted', text: `Jumu'ah ${fmt(t.jumuah)}` }) : null,

@@ -1,9 +1,10 @@
-// Deployment settings. Everything here is PUBLIC (it ships inside the app). Never put a secret here:
-// the API's only secret (PEPPER) lives in Cloudflare, set with `npx wrangler secret put PEPPER`.
+// Deployment settings. Everything here is PUBLIC (it ships inside the app). The Supabase "anon" key is public by
+// design: it only allows what the database's row-level security allows. Never put the secret "service" key here.
 export const CONFIG = Object.freeze({
-  version: '1.0.0', // keep in step with package.json; the release tag v1.0.0 must match
-  apiUrl: '', // e.g. 'https://qarib-api.<your-subdomain>.workers.dev'. Empty = demo mode (portal on this phone only)
-  updateRepo: 'rehank1/qarib', // 'owner/repo' on GitHub: the app checks its Releases for a newer APK. Empty = no update check
+  version: '1.0.1', // keep in step with the release tag (v1.0.1)
+  supabaseUrl: 'https://lgjivmerhgmypxhepqlt.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnaml2bWVyaGdteXB4aGVwcWx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUwMzA4ODAsImV4cCI6MjExMDYwNjg4MH0.FOgoh1H_Oo0CI2l-Llay6kwRTCFXaifFE3eoZZu62nU', // public anon key (role: anon)
+  updateRepo: 'rehank1/qarib', // GitHub repo whose Releases carry the APK
   appName: 'Qarīb',
   masjidLimit: 3,
   staleDays: 45, // jamaat times older than this are flagged "may be out of date"

@@ -138,6 +138,8 @@ details.settings[open] summary{margin-bottom:var(--s2)}
 .salawat-ar{font-family:var(--font-ar);font-size:var(--step-3);line-height:1.7;color:var(--gold-strong)}
 .salawat-tr{font-style:italic}
 @keyframes rise{from{transform:translateY(12px) scale(.98)}}
+.upd-v{font-size:var(--step-2);font-weight:700;color:var(--gold)}
+.upd-actions{justify-content:center}
 /* owner dashboard */
 .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2)}
 @media (min-width:520px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}

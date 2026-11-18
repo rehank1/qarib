@@ -8,7 +8,7 @@ import { createBackend } from './data/backend.js';
 import { defaultSettings, APP_METHODS, ASR } from './features/prayer/praytimes.js';
 import { nearestMasjids, nearestFrom, revive } from './features/masjids/overpass.js';
 import { createMetrics } from './core/metrics.js';
-import { checkForUpdate } from './core/update.js';
+import { checkForUpdate, showUpdate } from './core/update.js';
 import { showSalawat } from './features/prayer/salawat.js';
 import { prayerView } from './features/prayer/view.js';
 import { masjidsView } from './features/masjids/view.js';
@@ -92,9 +92,10 @@ const ctx = {
     state.masjids = { ...(m?.origin && distanceKm(m.origin, loc) < 0.3 ? m : {}), loading: true, error: '' };
     render();
     try {
-      // live: the shared, cached search on our API (one OpenStreetMap lookup per area per week); demo: straight to OSM
+      // live: the India directory in the database; if this area isn't loaded yet (or the backend is down), OpenStreetMap directly
       let list;
-      try { list = backend.masjids ? nearestFrom(await backend.masjids(loc), loc, CONFIG.masjidLimit) : null; } catch { list = null; } // API down or over its daily limit
+      try { list = backend.masjids ? nearestFrom(await backend.masjids(loc), loc, CONFIG.masjidLimit) : null; } catch { list = null; }
+      if (list && (!list.length || list[0].km > 30)) list = null;
       if (!list) list = await nearestMasjids(loc, { limit: CONFIG.masjidLimit }); // fall back to OpenStreetMap directly
       state.masjids = { origin: { lat: loc.lat, lng: loc.lng }, list, at: Date.now() };
       store.set('masjids', state.masjids, 7 * DAY);
@@ -133,7 +134,8 @@ const ctx = {
     if (!loc || state.portal.loadingClaimable) return;
     state.portal.loadingClaimable = true;
     try {
-      state.portal.claimable = backend.masjids ? nearestFrom(await backend.masjids(loc), loc, 25) : (state.masjids?.list || []);
+      const fromDb = backend.masjids ? nearestFrom(await backend.masjids(loc), loc, 25) : [];
+      state.portal.claimable = fromDb.length && fromDb[0].km <= 30 ? fromDb : (state.masjids?.list?.length ? state.masjids.list : await nearestMasjids(loc, { limit: 25 }));
     } catch { state.portal.claimable = state.masjids?.list || []; }
     finally { state.portal.claimableFor = `${loc.lat},${loc.lng}`; state.portal.loadingClaimable = false; if (tab() === 'portal') render(); }
   },
@@ -153,6 +155,11 @@ const ctx = {
   async signOut() { await backend.signOut(); state.portal = { mode: 'signin', mine: null }; toast('Signed out.'); render(); },
 
   /** Owner dashboard: live numbers, refreshed every 30 s while the Portal is open. */
+  async announceUpdate(version, message) {
+    await backend.setUpdateNotice(version, message, `https://github.com/${CONFIG.updateRepo}/releases/latest`);
+    toast(`Announced. Phones on an older version will be asked to update to ${version}.`);
+  },
+
   async loadStats() {
     if (!backend.stats || state.portal.loadingStats) return;
     state.portal.loadingStats = true;
@@ -227,11 +234,5 @@ render();
 metrics.open();
 showSalawat(ctx);
 
-// New app version on GitHub Releases → a quiet banner (Android app only; the website updates itself)
-if (window.Capacitor) checkForUpdate(store).then((rel) => {
-  if (!rel) return;
-  const bar = document.getElementById('update');
-  bar.querySelector('a').href = rel.url;
-  bar.querySelector('b').textContent = `Version ${rel.version.replace(/^v/, '')} is available.`;
-  bar.hidden = false;
-});
+// A newer version announced from the backend (or on GitHub) → an in-app update notice (Android app; the website updates itself)
+if (window.Capacitor) checkForUpdate(store, backend).then((rel) => rel && showUpdate(rel, store));

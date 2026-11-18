@@ -1,5 +1,5 @@
 // Portal for masjid authorities: sign in, ask to manage a masjid, publish its jamaat times.
-// The UI only guides; the server decides (row-level security). In demo mode everything stays on this phone.
+// The UI only guides; the server decides (row-level security).
 import { h, icon, toast } from '../../core/dom.js';
 import { isEmail, passwordProblem, timesProblems } from '../../core/validate.js';
 import { dashboard } from './dashboard.js';
@@ -7,11 +7,8 @@ import { formatDistance } from '../../core/geo.js';
 
 export function portalView(ctx) {
   const { backend, state } = ctx;
-  const demo = backend.mode === 'demo'
-    ? h('p', { class: 'banner', role: 'note' }, h('b', { text: 'Demo mode. ' }), 'No server is connected, so accounts and times stay on this phone and are not shown to anyone else.')
-    : null;
   const user = backend.user();
-  return [h('h1', { text: 'Masjid portal' }), demo, user ? signedIn(ctx, user) : signInForm(ctx, state.portal)];
+  return [h('h1', { text: 'Masjid portal' }), user ? signedIn(ctx, user) : signInForm(ctx, state.portal)];
 }
 
 function signInForm(ctx, p) {
@@ -97,7 +94,7 @@ function editor(ctx, x) {
     const problems = timesProblems(t);
     if (problems.length) { err.textContent = problems.join(' '); return; }
     save.disabled = true; err.textContent = '';
-    try { await ctx.backend.saveTimes(x.osm_id, t); toast(ctx.backend.mode === 'demo' ? 'Saved on this phone (demo).' : 'Published. Worshippers will see the new times.'); ctx.showPublished(x.osm_id, t); ctx.refreshJamaat(true); }
+    try { await ctx.backend.saveTimes(x.osm_id, t); toast('Published. Worshippers will see the new times.'); ctx.showPublished(x.osm_id, t); ctx.refreshJamaat(true); }
     catch (ex) { err.textContent = ex.status === 401 || ex.status === 403 ? 'You are not allowed to change this masjid. Sign in again, or ask the app owner to approve you.' : ex.message; }
     finally { save.disabled = false; }
   });
@@ -128,7 +125,7 @@ function claimCard(ctx) {
     finally { btn.disabled = false; }
   });
   return h('section', { class: 'card' }, h('h2', { text: 'Manage a masjid' }),
-    h('p', { class: 'muted small', text: ctx.backend.mode === 'demo' ? 'In demo mode you are approved at once.' : 'The app owner checks each request before you can publish times, so nobody can post false times for a masjid.' }),
+    h('p', { class: 'muted small', text: 'The app owner checks each request before you can publish times, so nobody can post false times for a masjid.' }),
     h('div', { class: 'field' }, h('label', { for: 'claim-sel', text: `Masjids near ${loc.label || 'you'} (nearest first)` }), sel),
     h('p', { class: 'muted small' }, 'Not listed? ', h('a', { class: 'link', href: '#prayer', text: 'Change your area' }), ' to where the masjid is. If it is missing from the map, add it on OpenStreetMap.'),
     btn);

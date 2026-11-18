@@ -52,8 +52,31 @@ function build(ctx) {
     ...(pending.length ? pending.map((c) => claimRow(ctx, c)) : [h('p', { class: 'muted small', text: 'Nothing waiting.' })]),
     h('h3', { text: `Approved imams (${n(approved.length)})` }),
     ...(approved.length ? approved.map((c) => approvedRow(ctx, c)) : [h('p', { class: 'muted small', text: 'None yet.' })]),
-    h('p', { class: 'muted small', text: `${n(s.totals.authorities)} imam accounts · ${n(s.totals.updates7d)} time updates this week` }),
+    h('p', { class: 'muted small', text: `${n(s.totals.authorities)} imam accounts · ${n(s.totals.updates7d)} time updates this week · masjid directory: ${n(s.totals.masjidsInDirectory)} masjids, ${n(s.totals.tilesLoaded)} of ${n(s.totals.tilesTotal)} areas of India loaded` }),
+    updateForm(ctx),
   );
+}
+
+/** Push an update notice to every installed app (after publishing the new APK on GitHub). */
+function updateForm(ctx) {
+  const ver = h('input', { id: 'upd-ver', inputmode: 'decimal', placeholder: '1.0.2', maxlength: '11', autocomplete: 'off' });
+  const msg = h('input', { id: 'upd-msg', placeholder: 'What is new (optional)', maxlength: '300', autocomplete: 'off' });
+  const err = h('p', { class: 'err-text', role: 'alert' });
+  const btn = h('button', { class: 'btn primary', type: 'submit', text: 'Announce' });
+  const form = h('form', { class: 'stack', novalidate: true },
+    h('h3', { text: 'Announce an update' }),
+    h('p', { class: 'muted small', text: 'After the new APK is on GitHub Releases: every phone on an older version shows an "Update available" notice on its next open.' }),
+    h('div', { class: 'field' }, h('label', { for: 'upd-ver', text: 'New version' }), ver),
+    h('div', { class: 'field' }, h('label', { for: 'upd-msg', text: 'Message' }), msg), err, btn);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault(); err.textContent = '';
+    if (!/^d{1,3}.d{1,3}.d{1,3}$/.test(ver.value.trim())) { err.textContent = 'Enter a version like 1.0.2.'; return; }
+    btn.disabled = true;
+    try { await ctx.announceUpdate(ver.value.trim(), msg.value.trim()); ver.value = ''; msg.value = ''; }
+    catch (ex) { err.textContent = ex.message; }
+    finally { btn.disabled = false; }
+  });
+  return form;
 }
 
 function claimRow(ctx, c) {

@@ -78,13 +78,17 @@ for (const [name, sel] of [['dark', ':root[data-theme="dark"]'], ['light', ':roo
   });
 }
 
-test('database: no API route can make anyone an owner or approve its own claim', () => {
-  const api = readFileSync(join(ROOT, 'api/src/index.js'), 'utf8');
-  assert.ok(!/UPDATE users SET[^']*is_owner/i.test(api), 'owner is set by hand in the database only');
-  assert.ok(api.includes('async function claims(req, env) {\n  await owner(req, env);'), 'approvals are owner-only');
-  const publicSelect = api.split('\n').find((l) => l.includes('FROM prayer_times WHERE osm_id IN'));
-  assert.ok(publicSelect && !publicSelect.includes('updated_by'), 'public reads never include who edited');
-  assert.ok(!/PEPPERs*=s*['"]/.test(readFileSync(join(ROOT, 'api/wrangler.toml'), 'utf8')), 'the pepper is a secret, not a config value');
+test('database: owner set by hand only, public reads never include who edited, no secrets in the app', () => {
+  const sql = readFileSync(join(ROOT, 'supabase/schema.sql'), 'utf8') + readFileSync(join(ROOT, 'supabase/directory.sql'), 'utf8');
+  const code = sql.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+  assert.ok(!/update\s+public\.profiles\s+set\s+is_owner/i.test(code), 'no function can make anyone owner');
+  assert.ok(sql.includes('grant select (osm_id, fajr, dhuhr, asr, maghrib, isha, jumuah, updated_at) on public.prayer_times to anon, authenticated'));
+  const configCode = readFileSync(join(ROOT, 'src/config.js'), 'utf8').split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
+  assert.ok(!/service_role/.test(configCode), 'never the service_role key');
+  for (const fn of ['admin_claims', 'decide_claim', 'set_update_notice', 'admin_stats']) {
+    const body = code.slice(code.indexOf('function public.' + fn));
+    assert.ok(body.slice(0, body.indexOf('end $$')).includes('if not public.is_owner() then raise'), fn + ' is owner-only');
+  }
 });
 
 test('dev server listens on this computer only', () => {
