@@ -35,7 +35,7 @@ src/features/location/       location in context · city search
 src/features/portal/         imam sign-in, claim, publish · owner dashboard
 supabase/                    schema.sql (security rules) · directory.sql (India masjid directory)
 android/                     Capacitor Android project (icons, splash, permissions, release signing)
-.github/workflows/           tests · signed APK → GitHub Release · API deploy
+.github/workflows/           tests · signed APK → GitHub Release
 design/logo/                 the Qarīb logo (SVG + PNG) and its notes
 tests/                       46 tests: prayer maths, security, contrast, database rules on real Postgres
 tools/probe-supabase.mjs     outsider test: what the public key can and cannot do
