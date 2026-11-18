@@ -1,151 +1,82 @@
 # Running Qarīb
 
-Everything here is free: GitHub (code, builds, APK downloads) and Cloudflare (API and database).
+Free on two services: **GitHub** (code, signed APK builds, downloads) and **Supabase** (project `qarib`, `lgjivmerhgmypxhepqlt`, free plan, Asia-Pacific).
 
-## 1. Deploy the API (once, about 15 minutes)
+## 1. The backend (already set up)
 
-You need a free Cloudflare account.
-
-1. In this folder, sign in to Cloudflare:
-   ```bash
-   npx wrangler login
-   ```
-2. Create the database:
-   ```bash
-   npx wrangler d1 create qarib
-   ```
-   Copy the `database_id` it prints into `api/wrangler.toml`.
-3. Create the tables:
-   ```bash
-   npx wrangler d1 execute qarib --remote --file=api/schema.sql --config api/wrangler.toml
-   ```
-4. Set the server secret: paste 40+ random characters when asked, and keep no other copy.
-   ```bash
-   npx wrangler secret put PEPPER --config api/wrangler.toml
-   ```
-5. Deploy:
-   ```bash
-   npx wrangler deploy --config api/wrangler.toml
-   ```
-   It prints a URL such as `https://qarib-api.<you>.workers.dev`.
-6. Put that URL in `src/config.js` as `apiUrl`, and set `updateRepo` to your GitHub repo (`owner/name`).
-7. Make yourself the owner. In the app, create your account in the Portal, then run:
-   ```bash
-   npx wrangler d1 execute qarib --remote --config api/wrangler.toml --command "UPDATE users SET is_owner = 1 WHERE email = 'you@example.com'"
-   ```
-   The dashboard appears in your Portal from then on.
-
-To let GitHub deploy API changes automatically, add a `CLOUDFLARE_API_TOKEN` repository secret (Cloudflare → My Profile → API Tokens → "Edit Cloudflare Workers" template).
-
-**Resetting an imam's password:** there's no email reset, which also means nobody can take over an account through email. Delete the account, and the imam signs up again and re-requests their masjid:
-```bash
-npx wrangler d1 execute qarib --remote --config api/wrangler.toml --command "DELETE FROM users WHERE email = 'imam@example.com'"
-```
-
-## 2. Publish the APK (GitHub Releases)
-
-One-time setup: the repository must be **public**, because a private repository's Releases can't be downloaded by the public. The code contains no secrets; the tests check that. Then add two repository secrets (Settings → Secrets and variables → Actions):
-
-| Secret | Value |
+| Part | Where |
 |---|---|
-| `ANDROID_KEYSTORE_BASE64` | contents of `.keys/keystore-base64.txt` |
-| `ANDROID_KEYSTORE_PASSWORD` | contents of `.keys/keystore-password.txt` |
+| Tables, security rules, owner functions, usage counts, update notice | `supabase/schema.sql` |
+| India masjid directory, nearest-masjid search, scheduled import | `supabase/directory.sql` |
+| App connection (public URL + public anon key) | `src/config.js` |
 
-**Keep `.keys/` safe forever.** Every update must be signed with the same key, or Android refuses to install it over the old version. Keep an offline backup, for example on a USB drive. It is never committed, because `.gitignore` excludes it.
+Both SQL files are safe to re-run: Supabase → **SQL Editor** → paste → **Run** (choose **Run and enable RLS** if asked). The secret `service_role` key is never used anywhere.
 
-**To release a version:**
-1. Set `version` in `src/config.js` (for example `1.0.1`).
+**The masjid directory fills itself.**
+- A scheduled job loads one area of India per minute from OpenStreetMap, big cities first (Pune first).
+- Busy areas retry after 10 minutes, and an area too dense for the public map server is split into smaller pieces.
+- Every area refreshes weekly.
+- If someone opens the app where nothing is loaded yet, that area jumps to the front of the queue, and the app asks OpenStreetMap directly meanwhile.
+- Progress shows on the owner dashboard: "masjid directory: … areas of India loaded".
+
+**Make yourself the owner (once).**
+1. In the app, Portal → **Create account**, then confirm the email Supabase sends you.
+2. In Supabase → SQL Editor, run:
+   ```sql
+   update public.profiles set is_owner = true where user_id = (select id from auth.users where email = 'you@example.com');
+   ```
+3. Open the Portal again: the dashboard appears.
+
+**Approving imams:** in the dashboard (Approve, Reject, Remove, or Remove and hide times).
+
+**Resetting an imam's account:** Supabase → Authentication → Users → the user → delete. The imam signs up again and re-requests their masjid.
+
+## 2. Releasing a new version
+
+1. Set `version` in `src/config.js` (for example `1.0.2`).
 2. Commit it.
 3. Tag and push:
    ```bash
-   git tag v1.0.1
+   git tag v1.0.2
    ```
    ```bash
-   git push origin main v1.0.1
+   git push origin main v1.0.2
    ```
+4. GitHub runs the tests, builds and signs the APK, and publishes it at https://github.com/rehank1/qarib/releases/latest (about 3 minutes).
+5. **Push the update to phones:** in the app's dashboard, under **Announce an update**, enter `1.0.2` and a short message, then tap **Announce**. Every phone on an older version shows "Update available" on its next open. Phones also check GitHub Releases daily as a fallback.
 
-GitHub then runs the tests, builds and signs the APK, and publishes **Qarib-v1.0.1.apk** with its SHA-256 checksum on the Releases page, in about 6 minutes. Share this link: https://github.com/rehank1/qarib/releases/latest.
+Keep `.keys/` (the signing key) backed up offline; every release must be signed with it.
 
-**Installing:** users open the link on their phone, download the APK and tap it. Android asks once to "allow installs from this source".
+## 3. What reaches users, and when
 
-## 3. Pushing updates
-
-| What changed | How it reaches users |
+| Change | When users see it |
 |---|---|
-| Jamaat times | **Instantly.** Imams publish in the Portal and phones fetch the new times (cached at most 30 s on the server; the imam's own phone shows them at once). No app update. |
-| Nearby masjid list | **Automatically.** Refreshed from OpenStreetMap at most weekly per area. |
-| The API (bug fixes, limits) | **Instantly** for everyone when you deploy the Worker. No app update. |
-| The app itself (screens, features) | **New release.** Tag a version as in section 2. Phones check GitHub once a day and show "Version 1.0.1 is available · Download the update"; the user taps, downloads and installs over the old version, keeping their settings. |
+| An imam publishes jamaat times | Instantly; pull to refresh on Masjids |
+| Masjid list for an area | When its area loads, then weekly |
+| A new app version | After you announce it: an in-app notice on next open |
 
-Sideloaded apps can't update silently. That only becomes possible through the Play Store (a one-time $25 fee).
+## 4. Security
 
-## 4. Load: the first 5,000–10,000 users
+- **Only the public anon key is in the app.** It can read published times, search the directory, read the update notice, send anonymous usage counts (rate-limited) and create an imam account that can do nothing until you approve it.
+- **Everything else is closed:** accounts, emails, requests, the audit history, usage data and every write. Run `node tools/probe-supabase.mjs` at any time to prove it from the outside; 21 checks, all must say OK.
+- **Anything added to the database later starts closed** until it is explicitly granted.
 
-**What one active user costs per day:**
-- about 4–5 API requests: one masjid lookup, one or two jamaat-time lookups, and one or two batched usage reports;
-- about 6–7 database writes: usage counters, rate-limit counters, and the daily "active" mark.
+## 5. Load
 
-Prayer times cost nothing: each phone calculates them itself.
+The free plan includes 500 MB of database storage, 50,000 monthly active users, and 5 GB of data transfer a month.
+- **The India directory is small:** about 50–100 MB.
+- **Worshippers never sign in,** so only imams count towards the 50,000 monthly users.
+- **Each app open costs a few small requests,** typically under 10 KB in total.
 
-| Cloudflare free limit (per day) | 10,000 daily users need | Headroom |
-|---|---|---|
-| Worker requests: 100,000 | ~50,000 | 2× |
-| D1 rows read: 5,000,000 | ~150,000 | 30× |
-| D1 rows written: 100,000 | ~70,000 | 1.4× |
-| D1 storage: 5 GB | a few MB | huge |
+One thing to watch: **free Supabase projects pause after 7 days without activity.** Normal daily use keeps it awake. If it ever pauses, open the project in the Supabase dashboard and click Restore.
 
-**What keeps it light:**
-- **Masjid searches are shared.** One OpenStreetMap lookup serves everyone in a ~2 km area for a week. Ten thousand people in Pune cause a few hundred map lookups, not ten thousand.
-- **Jamaat times are cached** at Cloudflare's edge for 60 s, and on each phone.
-- **Usage reports are batched:** one request per few seconds of use, and anonymous.
-- **Requests are rate-limited** per network address, so one misbehaving phone or bot can't use up the quota.
-- **If the API ever hits its daily limit,** the app keeps working: prayer times are local, and masjid search falls back to OpenStreetMap directly.
-
-**When you grow past about 12,000 daily users,** the first limit you'll reach is database writes. Either:
-- move to Cloudflare Workers Paid at $5/month, which includes 50 million D1 writes a month; or
-- sample the usage counts, for example from one phone in four.
-
-GitHub Release downloads have no bandwidth limit for public repositories.
-
-## 5. The dashboard
-
-Sign in to the Portal with the owner account. The dashboard refreshes every 30 seconds and shows:
-- **Active today:** phones that opened the app today. Each phone counts once per day and can't be linked between days.
-- **App opens today**, and **Directions today** (taps on the Directions button).
-- **Active users over 14 days,** as a bar chart.
-- **Most visited masjids over 7 days,** by Directions taps and by how often each was shown in the list.
-- **Imam requests,** with Approve and Reject buttons.
-
-**Not collected, by design:**
-- **Not collected:** anyone's location, name or device.
-- **Never stored:** the phone's install ID itself, only a hash that changes daily.
-
-Users can turn usage counts off in Settings → Usage counts.
-
-## 6. Test the whole thing on your PC
-
-Run the real API code with a local database and sample Pune masjids, plus the app connected to it:
+## 6. Tests
 
 ```bash
-npm run dev:api
+npm test
 ```
 
-```bash
-npm run serve:live
-```
-
-Then open http://localhost:4181:
-1. Create an account in the Portal.
-2. Make it the owner:
-   ```bash
-   npm run dev:owner -- you@example.com
-   ```
-3. Use a second account as an imam.
-
-The local database is `.dev/qarib.sqlite`, which is git-ignored; delete it to start again.
-
-**Scenarios tested end to end on 18 November 2026:**
-- **Imam:** signup (weak password and bad email explained), duplicate email, wrong password and unknown email (same message), lockout after 5 tries, request a masjid, a pending imam can't publish (even via the API), approval, out-of-order times refused, publish, then removal (with or without hiding their times) and asking again.
-- **Owner:** the dashboard appears without signing in again, approve and remove imams, and the live refresh doesn't disturb a form being filled in.
-- **Worshipper:** sees published times, sees an update on refresh, and keeps the saved list and times when the API is down.
-- **Sessions:** an expired session asks the user to sign in again, and signing out invalidates the token on the server.
+There are 46 tests:
+- prayer-time maths checked against Aladhan;
+- security and contrast checks;
+- every database rule run on a real Postgres engine (PGlite) as an anonymous worshipper, an imam and the owner.
