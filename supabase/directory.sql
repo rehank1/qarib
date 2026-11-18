@@ -39,7 +39,7 @@ $$;
 
 /** Load one tile from OpenStreetMap (two mirrors), upsert its masjids, drop ones that were deleted from the map. */
 create or replace function private.refresh_tile(p_tile text) returns int language plpgsql security definer set search_path = public, private, extensions, pg_temp as $$
-declare t record; q text; st int := 0; body text; started timestamptz := now(); n int := 0; url text;
+declare t record; q text; st int := 0; body text; started timestamptz := now(); v_found int := 0; url text;
 begin
   select * into t from private.import_tiles where tile = p_tile;
   if not found then return -1; end if;
@@ -72,10 +72,10 @@ begin
     where id ~ '^(node|way|relation)/[0-9]{1,12}$' and lat between -90 and 90 and lng between -180 and 180
     on conflict (osm_id) do update set name = excluded.name, name_ar = excluded.name_ar, address = excluded.address,
       location = excluded.location, tile = excluded.tile, updated_at = excluded.updated_at;
-  get diagnostics n = row_count;
+  get diagnostics v_found = row_count;
   delete from public.masjids where tile = p_tile and updated_at < started; -- no longer on the map
-  update private.import_tiles set status = 'ok', found = n, refreshed_at = now(), priority = least(priority, 100) where tile = p_tile;
-  return n;
+  update private.import_tiles set status = 'ok', found = v_found, refreshed_at = now(), priority = least(priority, 100) where tile = p_tile;
+  return v_found;
 end $$;
 
 /** Called every minute by pg_cron: refresh the most important tile that is missing or older than a week. */
